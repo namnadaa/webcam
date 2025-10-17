@@ -7,6 +7,15 @@ import (
 	"gocv.io/x/gocv"
 )
 
+func openTestCamera(t *testing.T, cfg camera.Config) *camera.Camera {
+	t.Helper()
+	cam, err := camera.Open(cfg)
+	if err != nil {
+		t.Fatalf("failed to open camera: %v", err)
+	}
+	return cam
+}
+
 func TestOpen(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -116,5 +125,53 @@ func TestCamera_Read(t *testing.T) {
 				t.Errorf("Read(): got  = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCamera_Properties(t *testing.T) {
+	cam := openTestCamera(t, camera.Config{
+		Index:  0,
+		API:    camera.APIAVFoundation,
+		Width:  640,
+		Height: 480,
+		FPS:    30,
+	})
+	defer cam.Close()
+
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			"Get exposure",
+			func(t *testing.T) {
+				val := cam.Get(gocv.VideoCaptureExposure)
+				t.Logf("Exposure: %v", val)
+			},
+		},
+		{
+			"Set width/height",
+			func(t *testing.T) {
+				cam.Set(gocv.VideoCaptureFrameWidth, 800)
+				cam.Set(gocv.VideoCaptureFrameHeight, 600)
+				w, h := cam.ActualSize()
+				if w == 0 || h == 0 {
+					t.Errorf("invalid size: %dx%d", w, h)
+				}
+			},
+		},
+		{
+			"Check FPS",
+			func(t *testing.T) {
+				fps := cam.ActualFPS()
+				if fps <= 0 {
+					t.Errorf("invalid FPS: %v", fps)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
 	}
 }
