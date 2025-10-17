@@ -4,12 +4,15 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"runtime"
 	"webcam/internal/camera"
 
 	"gocv.io/x/gocv"
 )
 
 func main() {
+	runtime.LockOSThread()
+
 	cfg := camera.Config{
 		Index:  0,
 		API:    camera.APIAVFoundation,
@@ -36,13 +39,18 @@ func main() {
 			continue
 		}
 
-		err = gocv.Rectangle(&frame, image.Rect(10, 10, 300, 60), color.RGBA{0, 0, 0, 120}, -1)
+		err = gocv.Flip(frame, &frame, 1)
+		if err != nil {
+			log.Fatalf("failed to reflect the image: %v", err)
+		}
+
+		err = gocv.Rectangle(&frame, image.Rect(10, 10, 260, 60), color.RGBA{0, 0, 0, 120}, -1)
 		if err != nil {
 			log.Fatalf("failed to create rectangle: %v", err)
 		}
 		gocv.PutText(&frame, "Press ESC to exit",
 			image.Pt(20, 45), gocv.FontHersheySimplex, 0.8,
-			color.RGBA{0, 255, 0, 255}, 2)
+			color.RGBA{255, 255, 255, 120}, 2)
 
 		err = win.IMShow(frame)
 		if err != nil {

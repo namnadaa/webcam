@@ -6,15 +6,18 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// API defines a video capture backend type.
 type API = gocv.VideoCaptureAPI
 
+// Supported video capture backends.
 const (
-	APIAny          = gocv.VideoCaptureAny
-	APIAVFoundation = gocv.VideoCaptureAVFoundation
-	APIV4L2         = gocv.VideoCaptureV4L2
-	APIMSMF         = gocv.VideoCaptureMSMF
+	APIAny          = gocv.VideoCaptureAny          // Auto-detect backend
+	APIAVFoundation = gocv.VideoCaptureAVFoundation // macOS AVFoundation
+	APIV4L2         = gocv.VideoCaptureV4L2         // Linux V4L2
+	APIMSMF         = gocv.VideoCaptureMSMF         // Windows Media Foundation
 )
 
+// Config holds camera initialization parameters.
 type Config struct {
 	Index  int
 	API    API
@@ -23,11 +26,13 @@ type Config struct {
 	FPS    float64
 }
 
+// Camera represents an active video capture device.
 type Camera struct {
 	cap *gocv.VideoCapture
 	cfg Config
 }
 
+// Open initializes and returns a new camera instance.
 func Open(cfg Config) (*Camera, error) {
 	if cfg.API == 0 {
 		cfg.API = APIAny
@@ -36,17 +41,9 @@ func Open(cfg Config) (*Camera, error) {
 	var cap *gocv.VideoCapture
 	var err error
 
-	for i := 0; i < 5; i++ {
-		cap, err = gocv.OpenVideoCaptureWithAPI(i, cfg.API)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open capture: %w", err)
-		}
-
-		if cap.IsOpened() {
-			fmt.Printf("Camera opened on index %v\n", i)
-			cfg.Index = i
-			break
-		}
+	cap, err = gocv.OpenVideoCaptureWithAPI(cfg.Index, cfg.API)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open capture: %w", err)
 	}
 
 	if cap == nil || !cap.IsOpened() {
@@ -76,6 +73,7 @@ func Open(cfg Config) (*Camera, error) {
 	return &c, nil
 }
 
+// Close releases the camera resource.
 func (c *Camera) Close() error {
 	err := c.cap.Close()
 	if err != nil {
@@ -84,6 +82,7 @@ func (c *Camera) Close() error {
 	return nil
 }
 
+// Read captures a single frame from the camera.
 func (c *Camera) Read(dst *gocv.Mat) bool {
 	return c.cap.Read(dst)
 }
