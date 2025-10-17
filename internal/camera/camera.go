@@ -86,3 +86,25 @@ func (c *Camera) Close() error {
 func (c *Camera) Read(dst *gocv.Mat) bool {
 	return c.cap.Read(dst)
 }
+
+// Get returns the current value of a camera property.
+func (c *Camera) Get(prop gocv.VideoCaptureProperties) float64 {
+	return c.cap.Get(prop)
+}
+
+// Set sets a camera property to a given value.
+func (c *Camera) Set(prop gocv.VideoCaptureProperties, val float64) {
+	c.cap.Set(prop, val)
+}
+
+// ActualSize returns the applied frame width and height.
+func (c *Camera) ActualSize() (w, h int) {
+	wf := c.cap.Get(gocv.VideoCaptureFrameWidth)
+	hf := c.cap.Get(gocv.VideoCaptureFrameHeight)
+	return int(wf + 0.5), int(hf + 0.5)
+}
+
+// ActualFPS returns the applied frames per second.
+func (c *Camera) ActualFPS() float64 {
+	return c.cap.Get(gocv.VideoCaptureFPS)
+}
