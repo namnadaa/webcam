@@ -22,47 +22,89 @@ func colorRGB(r, g, b uint8) color.RGBA {
 
 func TestFilters(t *testing.T) {
 	tests := []struct {
-		name string
-		run  func(src gocv.Mat) gocv.Mat
+		name    string
+		run     func(src gocv.Mat) (gocv.Mat, error)
+		wantErr bool
 	}{
 		{
 			name: "Gray conversion",
-			run: func(src gocv.Mat) gocv.Mat {
+			run: func(src gocv.Mat) (gocv.Mat, error) {
 				return filters.Gray(src)
 			},
 		},
 		{
 			name: "Gaussian Blur with ksize=5",
-			run: func(src gocv.Mat) gocv.Mat {
+			run: func(src gocv.Mat) (gocv.Mat, error) {
 				return filters.Blur(src, 5)
 			},
 		},
 		{
 			name: "Gaussian Blur with invalid ksize (0)",
-			run: func(src gocv.Mat) gocv.Mat {
+			run: func(src gocv.Mat) (gocv.Mat, error) {
 				return filters.Blur(src, 0)
 			},
 		},
 		{
 			name: "Edge detection (valid thresholds)",
-			run: func(src gocv.Mat) gocv.Mat {
+			run: func(src gocv.Mat) (gocv.Mat, error) {
 				return filters.Edge(src, 50, 150)
 			},
 		},
 		{
 			name: "Edge detection (invalid thresholds)",
-			run: func(src gocv.Mat) gocv.Mat {
+			run: func(src gocv.Mat) (gocv.Mat, error) {
 				return filters.Edge(src, 0, 0)
+			},
+		},
+		{
+			name: "Brightness and contrast adjustment (valid)",
+			run: func(src gocv.Mat) (gocv.Mat, error) {
+				return filters.BrightnessContrast(src, 1.5, 20)
+			},
+		},
+		{
+			name: "Brightness and contrast adjustment (out of range alpha/beta)",
+			run: func(src gocv.Mat) (gocv.Mat, error) {
+				dst, err := filters.BrightnessContrast(src, 1000, 500)
+				if err != nil {
+					return dst, err
+				}
+				return dst, nil
+			},
+		},
+		{
+			name: "Brightness and contrast adjustment (empty source)",
+			run: func(_ gocv.Mat) (gocv.Mat, error) {
+				empty := gocv.NewMat()
+				defer empty.Close()
+				return filters.BrightnessContrast(empty, 1.0, 0)
+			},
+			wantErr: true,
+		},
+		{
+			name: "Sharpen filter",
+			run: func(src gocv.Mat) (gocv.Mat, error) {
+				return filters.Sharpen(src)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			src := createTestImage()
-			defer src.Close()
+			var src gocv.Mat
+			if !tt.wantErr {
+				src = createTestImage()
+				defer src.Close()
+			}
 
-			dst := tt.run(src)
+			dst, err := tt.run(src)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("%s: unexpected error: %v", tt.name, err)
+				}
+				return
+			}
+
 			defer dst.Close()
 
 			if dst.Empty() {

@@ -102,7 +102,7 @@ func BrightnessContrast(src gocv.Mat, alpha, beta float64) (gocv.Mat, error) {
 	}
 
 	dst := gocv.NewMat()
-	err := gocv.AddWeighted(src, alpha, gocv.NewMat(), beta, 0, &dst)
+	err := gocv.AddWeighted(src, alpha, src, beta, 0, &dst)
 	if err != nil {
 		return gocv.NewMat(), fmt.Errorf("failed to adjust brightness and contrast: %w", err)
 	}
