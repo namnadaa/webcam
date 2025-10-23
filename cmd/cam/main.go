@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"runtime"
 	"webcam/internal/camera"
+	"webcam/internal/filters"
 
 	"gocv.io/x/gocv"
 )
@@ -14,50 +16,79 @@ func main() {
 	runtime.LockOSThread()
 
 	cfg := camera.Config{
-		Index:  0,
-		API:    camera.APIAVFoundation,
+		Index:  1,
+		API:    camera.APIAny,
 		Width:  1280,
 		Height: 720,
-		FPS:    60,
+		FPS:    30,
 	}
 
 	cam, err := camera.Open(cfg)
 	if err != nil {
-		log.Fatalf("camera not opened on API: %v, err: %v", cfg.API, err)
+		log.Fatalf("camera not opened: %v", err)
 	}
 	defer cam.Close()
 
-	win := gocv.NewWindow("Mac Camera")
+	win := gocv.NewWindow("Interactive Filters")
 	defer win.Close()
 
 	frame := gocv.NewMat()
 	defer frame.Close()
 
+	alpha := 1.0 // contrast
+	beta := 0.0  // brightness
+
+	fmt.Println("Controls:")
+	fmt.Println("  ↑ / w : increase brightness")
+	fmt.Println("  ↓ / s : decrease brightness")
+	fmt.Println("  → / d : increase contrast")
+	fmt.Println("  ← / a : decrease contrast")
+	fmt.Println("  ESC   : exit")
+
 	for {
-		ok := cam.Read(&frame)
-		if !ok || frame.Empty() {
+		if ok := cam.Read(&frame); !ok || frame.Empty() {
 			continue
 		}
 
-		err = gocv.Flip(frame, &frame, 1)
-		if err != nil {
-			log.Fatalf("failed to reflect the image: %v", err)
-		}
+		gray, _ := filters.Gray(frame)
+		processed, _ := filters.BrightnessContrast(gray, alpha, beta)
 
-		err = gocv.Rectangle(&frame, image.Rect(10, 10, 260, 60), color.RGBA{0, 0, 0, 120}, -1)
+		err := gocv.Rectangle(&processed, image.Rect(10, 10, 360, 80), color.RGBA{0, 0, 0, 120}, -1)
 		if err != nil {
 			log.Fatalf("failed to create rectangle: %v", err)
 		}
-		gocv.PutText(&frame, "Press ESC to exit",
-			image.Pt(20, 45), gocv.FontHersheySimplex, 0.8,
-			color.RGBA{255, 255, 255, 120}, 2)
 
-		err = win.IMShow(frame)
-		if err != nil {
-			log.Fatalf("failed to show display: %v", err)
+		text := fmt.Sprintf("contrast=%.1f  brightness=%.1f", alpha, beta)
+		gocv.PutText(&processed, text, image.Pt(20, 50),
+			gocv.FontHersheySimplex, 0.7, color.RGBA{255, 255, 255, 0}, 2)
+
+		win.IMShow(processed)
+
+		key := win.WaitKey(10)
+		switch key {
+		case 27:
+			return
+		case int('w'), int('W'):
+			beta += 5
+		case int('s'), int('S'):
+			beta -= 5
+		case int('d'), int('D'):
+			alpha += 0.1
+		case int('a'), int('A'):
+			alpha -= 0.1
 		}
-		if win.WaitKey(1) == 27 {
-			break
+
+		if alpha < 0.1 {
+			alpha = 0.1
+		}
+		if alpha > 3.0 {
+			alpha = 3.0
+		}
+		if beta < -100 {
+			beta = -100
+		}
+		if beta > 100 {
+			beta = 100
 		}
 	}
 }
