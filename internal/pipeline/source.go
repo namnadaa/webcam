@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 	"webcam/internal/camera"
+	"webcam/internal/control"
 	"webcam/internal/filters"
 
 	"gocv.io/x/gocv"
@@ -75,7 +76,7 @@ func GrayStage() StageFunc {
 }
 
 // BlurStage applies Gaussian blur.
-func BlurStage(ksize int) StageFunc {
+func BlurStage(p *control.BlurParams) StageFunc {
 	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
 		next := make(chan Frame)
 		go func() {
@@ -86,7 +87,7 @@ func BlurStage(ksize int) StageFunc {
 					if !ok {
 						return
 					}
-					dst, err := filters.Blur(f.Img, ksize)
+					dst, err := filters.Blur(f.Img, p.Ksize)
 					f.Close()
 					if err != nil {
 						mapErr("blur", err)
@@ -103,7 +104,7 @@ func BlurStage(ksize int) StageFunc {
 }
 
 // EdgeStage detects edges using the Canny algorithm.
-func EdgeStage(th1, th2 float32) StageFunc {
+func EdgeStage(p *control.EdgeParams) StageFunc {
 	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
 		next := make(chan Frame)
 		go func() {
@@ -114,7 +115,7 @@ func EdgeStage(th1, th2 float32) StageFunc {
 					if !ok {
 						return
 					}
-					dst, err := filters.Edge(f.Img, th1, th2)
+					dst, err := filters.Edge(f.Img, p.Threshold1, p.Threshold2)
 					f.Close()
 					if err != nil {
 						mapErr("edge", err)
@@ -131,7 +132,7 @@ func EdgeStage(th1, th2 float32) StageFunc {
 }
 
 // BrightnessContrastStage adjusts brightness and contrast.
-func BrightnessContrastStage(alpha, beta float64) StageFunc {
+func BrightnessContrastStage(p *control.BrightnessContrastParams) StageFunc {
 	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
 		next := make(chan Frame)
 		go func() {
@@ -142,7 +143,7 @@ func BrightnessContrastStage(alpha, beta float64) StageFunc {
 					if !ok {
 						return
 					}
-					dst, err := filters.BrightnessContrast(f.Img, alpha, beta)
+					dst, err := filters.BrightnessContrast(f.Img, p.Alpha, p.Beta)
 					f.Close()
 					if err != nil {
 						mapErr("brightness_contrast", err)
