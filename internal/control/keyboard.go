@@ -1,0 +1,52 @@
+package control
+
+import "gocv.io/x/gocv"
+
+// HandleKeyboard — changes parameters by pressing buttons.
+// Returns false if the program needs to be terminated.
+func HandleKeyboard(win *gocv.Window, params *PipelineParams) bool {
+	key := win.WaitKey(1)
+
+	switch key {
+	case 27: // ESC
+		return false
+
+		// ===== Brightness =====
+	case int('w'), int('W'):
+		params.Brightness.Beta += 5
+	case int('s'), int('S'):
+		params.Brightness.Beta -= 5
+
+		// ===== Contrast =====
+	case int('d'), int('D'):
+		params.Brightness.Alpha += 0.1
+	case int('a'), int('A'):
+		params.Brightness.Alpha -= 0.1
+
+		// ===== Blur size (Gaussian) =====
+	case int('e'), int('E'):
+		params.Blur.Ksize += 2
+		if params.Blur.Ksize%2 == 0 {
+			params.Blur.Ksize++
+		}
+	case int('q'), int('Q'):
+		if params.Blur.Ksize > 3 {
+			params.Blur.Ksize -= 2
+			if params.Blur.Ksize%2 == 0 {
+				params.Blur.Ksize--
+			}
+		}
+
+		// ===== Canny thresholds =====
+	case int('j'), int('J'):
+		params.Edge.Threshold1 -= 5
+	case int('k'), int('K'):
+		params.Edge.Threshold1 += 5
+	case int('n'), int('N'):
+		params.Edge.Threshold2 -= 5
+	case int('m'), int('M'):
+		params.Edge.Threshold2 += 5
+	}
+
+	return true
+}
