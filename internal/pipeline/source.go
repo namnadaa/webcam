@@ -59,6 +59,10 @@ func GrayStage() StageFunc {
 					if !ok {
 						return
 					}
+					if f.Img.Channels() == 1 {
+						next <- f
+						continue
+					}
 					dst, err := filters.Gray(f.Img)
 					f.Close()
 					if err != nil {
@@ -178,52 +182,6 @@ func SharpenStage() StageFunc {
 						continue
 					}
 					next <- Frame{Img: dst, Time: time.Now()}
-				case <-done:
-					return
-				}
-			}
-		}()
-		return next
-	}
-}
-
-// PassthroughStage forwards frames without modification.
-func PassthroughStage() StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
-		next := make(chan Frame)
-		go func() {
-			defer close(next)
-			for {
-				select {
-				case f, ok := <-prev:
-					if !ok {
-						return
-					}
-					next <- f
-				case <-done:
-					return
-				}
-			}
-		}()
-		return next
-	}
-}
-
-// CloneStage a protective copy of the frame.
-func CloneStage() StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
-		next := make(chan Frame)
-		go func() {
-			defer close(next)
-			for {
-				select {
-				case f, ok := <-prev:
-					if !ok {
-						return
-					}
-					cl := f.Img.Clone()
-					f.Close()
-					next <- Frame{Img: cl, Time: time.Now()}
 				case <-done:
 					return
 				}

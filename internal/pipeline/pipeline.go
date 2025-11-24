@@ -15,5 +15,6 @@ func BuildPipeline(cam *camera.Camera, stages []StageToggle, params *control.Pip
 		}
 	}
 
+	frames = ToBGRStage()(frames, done)
 	return frames
 }
