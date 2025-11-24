@@ -19,7 +19,7 @@ type BrightnessContrastParams struct {
 
 // PipelineParams is a common set of parameters for all pipeline stages.
 type PipelineParams struct {
-	Blur       BlurParams
-	Edge       EdgeParams
-	Brightness BrightnessContrastParams
+	Blur               BlurParams
+	Edge               EdgeParams
+	BrightnessContrast BrightnessContrastParams
 }

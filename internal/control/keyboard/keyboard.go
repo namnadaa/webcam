@@ -1,27 +1,49 @@
-package control
+package keyboard
 
-import "gocv.io/x/gocv"
+import (
+	"webcam/internal/control"
+	"webcam/internal/pipeline"
+
+	"gocv.io/x/gocv"
+)
 
 // HandleKeyboard — changes parameters by pressing buttons.
 // Returns false if the program needs to be terminated.
-func HandleKeyboard(win *gocv.Window, params *PipelineParams) bool {
+func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle) (bool, bool) {
 	key := win.WaitKey(1)
+	stageChanged := false
 
 	switch key {
 	case 27: // ESC
-		return false
+		return false, false
+
+	case 49: // brightness/contrast
+		stages[0].Enabled = !stages[0].Enabled
+		stageChanged = true
+	case 50: // blur
+		stages[1].Enabled = !stages[1].Enabled
+		stageChanged = true
+	case 51: // edge
+		stages[2].Enabled = !stages[2].Enabled
+		stageChanged = true
+	case 52: // gray
+		stages[3].Enabled = !stages[3].Enabled
+		stageChanged = true
+	case 53: // sharpen
+		stages[4].Enabled = !stages[4].Enabled
+		stageChanged = true
 
 		// ===== Brightness =====
 	case int('w'), int('W'):
-		params.Brightness.Beta += 5
+		params.BrightnessContrast.Beta += 5
 	case int('s'), int('S'):
-		params.Brightness.Beta -= 5
+		params.BrightnessContrast.Beta -= 5
 
 		// ===== Contrast =====
 	case int('d'), int('D'):
-		params.Brightness.Alpha += 0.1
+		params.BrightnessContrast.Alpha += 0.1
 	case int('a'), int('A'):
-		params.Brightness.Alpha -= 0.1
+		params.BrightnessContrast.Alpha -= 0.1
 
 		// ===== Blur size (Gaussian) =====
 	case int('e'), int('E'):
@@ -48,5 +70,5 @@ func HandleKeyboard(win *gocv.Window, params *PipelineParams) bool {
 		params.Edge.Threshold2 += 5
 	}
 
-	return true
+	return true, stageChanged
 }
