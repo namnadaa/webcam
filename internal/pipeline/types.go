@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"time"
+	"webcam/internal/control"
 
 	"gocv.io/x/gocv"
 )
@@ -15,6 +16,12 @@ type Frame struct {
 // Close releases frame resources.
 func (f *Frame) Close() {
 	f.Img.Close()
+}
+
+// StageToggle — pipeline element that can be turned on/off
+type StageToggle struct {
+	Enabled bool
+	Build   func(params *control.PipelineParams) StageFunc
 }
 
 // StageFunc defines a processing stage function type.
