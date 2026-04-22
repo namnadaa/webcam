@@ -25,7 +25,7 @@ func CompareInternalExternal(cameras []Config) {
 		return
 	}
 
-	fmt.Println("Camera Comparison")
+	fmt.Println("\nCamera Comparison")
 	fmt.Println("===============================================================")
 
 	fmt.Printf("%-20s %-15s", "Parameter", "Internal")
@@ -36,13 +36,12 @@ func CompareInternalExternal(cameras []Config) {
 
 	fmt.Println("---------------------------------------------------------------")
 
-	fmt.Printf("%-20s %-15dx%-7d",
-		"Resolution",
-		internal.Width, internal.Height,
-	)
+	internalRes := fmt.Sprintf("%dx%d", internal.Width, internal.Height)
+	fmt.Printf("%-20s %-15s", "Resolution", internalRes)
 
 	for _, ext := range externals {
-		fmt.Printf(" %-15dx%-7d", ext.Width, ext.Height)
+		res := fmt.Sprintf("%dx%d", ext.Width, ext.Height)
+		fmt.Printf(" %-15s", res)
 	}
 	fmt.Println()
 

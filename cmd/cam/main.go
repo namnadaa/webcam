@@ -1,76 +1,10 @@
-// package main
-
-// import (
-// 	"fmt"
-// 	"log"
-// 	"runtime"
-// 	"webcam/internal/camera"
-// 	"webcam/internal/pipeline"
-
-// 	"gocv.io/x/gocv"
-// )
-
-// func main() {
-// 	runtime.LockOSThread()
-
-// 	cfg := camera.Config{
-// 		Index:  1,
-// 		API:    camera.APIAny,
-// 		Width:  1280,
-// 		Height: 720,
-// 		FPS:    30,
-// 	}
-
-// 	cam, err := camera.Open(cfg)
-// 	if err != nil {
-// 		log.Fatalf("camera not opened: %v", err)
-// 	}
-// 	defer cam.Close()
-
-// 	win := gocv.NewWindow("Pipeline Demo")
-// 	defer win.Close()
-
-// 	done := make(chan struct{})
-
-// 	pipe := pipeline.New(
-// 		done,
-// 		pipeline.GrayStage(),
-// 		pipeline.BrightnessContrastStage(1.0, 20.0),
-// 		pipeline.ToBGRStage(),
-// 	)
-
-// 	frames := pipe.Run(pipeline.ReadStage(cam, done))
-// 	sink := pipeline.WindowSink(win)
-
-// 	fmt.Println("Press ESC to exit")
-
-// 	for {
-// 		select {
-// 		case f, ok := <-frames:
-// 			if !ok {
-// 				close(done)
-// 				return
-// 			}
-// 			sink(f)
-
-//			default:
-//				if win.WaitKey(1) == 27 {
-//					close(done)
-//					return
-//				}
-//			}
-//		}
-//	}
-//
-// /////////////////////////////////
-// /////////////////////////////////
-// /////////////////////////////////
-// /////////////////////////////////
-// /////////////////////////////////
 package main
 
 import (
+	"image"
+	"image/color"
 	"log"
+	"runtime"
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
@@ -80,12 +14,23 @@ import (
 )
 
 func main() {
+	runtime.LockOSThread()
+
+	cams := camera.FindCameras()
+	camera.CompareInternalExternal(cams)
+
+	var index int = 0
+
+	for _, cam := range cams {
+		if cam.IsExternal {
+			index = cam.Index
+			break
+		}
+	}
+
 	cfg := camera.Config{
-		Index:  1,
-		API:    camera.APIAny,
-		Width:  1280,
-		Height: 720,
-		FPS:    30,
+		Index: index,
+		API:   camera.APIAny,
 	}
 
 	cam, err := camera.Open(cfg)
@@ -94,7 +39,7 @@ func main() {
 	}
 	defer cam.Close()
 
-	win := gocv.NewWindow("Pipeline Control")
+	win := gocv.NewWindow("Camera")
 	defer win.Close()
 
 	stages := []pipeline.StageToggle{
@@ -150,6 +95,29 @@ func main() {
 		frames := pipeline.BuildPipeline(cam, stages, params, done)
 
 		for f := range frames {
+			help := []string{
+				"1: Toggle Brightness/Contrast",
+				"2: Toggle Blur",
+				"3: Toggle Edge",
+				"4: Toggle Gray",
+				"5: Toggle Sharpen",
+				"ESC: Quit",
+			}
+
+			y := 20
+			for _, line := range help {
+				gocv.PutText(
+					&f.Img,
+					line,
+					image.Pt(10, y),
+					gocv.FontHersheyPlain,
+					1.2,
+					color.RGBA{255, 255, 255, 0},
+					1,
+				)
+				y += 20
+			}
+
 			win.IMShow(f.Img)
 
 			cont, changed := keyboard.HandleKeyboard(win, params, stages)
@@ -161,14 +129,6 @@ func main() {
 			if changed {
 				break
 			}
-
-			// fmt.Printf("alpha=%.2f beta=%.2f blur=%d th1=%.0f th2=%.0f\n",
-			// 	params.BrightnessContrast.Alpha,
-			// 	params.BrightnessContrast.Beta,
-			// 	params.Blur.Ksize,
-			// 	params.Edge.Threshold1,
-			// 	params.Edge.Threshold2,
-			// )
 		}
 	}
 }
