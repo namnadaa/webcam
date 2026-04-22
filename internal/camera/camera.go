@@ -19,11 +19,13 @@ const (
 
 // Config holds camera initialization parameters.
 type Config struct {
-	Index  int
-	API    API
-	Width  int
-	Height int
-	FPS    float64
+	Index      int
+	API        API
+	Width      int
+	Height     int
+	FPS        float64
+	Format     string
+	IsExternal bool
 }
 
 // Camera represents an active video capture device.
@@ -109,11 +111,26 @@ func (c *Camera) ActualFPS() float64 {
 	return c.cap.Get(gocv.VideoCaptureFPS)
 }
 
+// PixelFormat returns the FOURCC pixel format of the camera stream.
+func (c *Camera) PixelFormat() int {
+	return int(c.cap.Get(gocv.VideoCaptureFOURCC))
+}
+
+// FourCCToString converts a FOURCC integer code into a human-readable string.
+func FourCCToString(fourcc int) string {
+	return string([]byte{
+		byte(fourcc),
+		byte(fourcc >> 8),
+		byte(fourcc >> 16),
+		byte(fourcc >> 24),
+	})
+}
+
 // FindCameras searches for connected cameras and returns the Config list.
 func FindCameras() []Config {
 	var cameras []Config
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		cfg := Config{
 			Index: i,
 			API:   APIAny,
@@ -124,15 +141,23 @@ func FindCameras() []Config {
 			continue
 		}
 
-		w, h := cam.ActualSize()
+		width, height := cam.ActualSize()
 		fps := cam.ActualFPS()
-		cam.Close()
+		format := FourCCToString(cam.PixelFormat())
+		if format == "\x00\x00\x00\x00" {
+			format = "Unknown"
+		}
+
+		_ = cam.Close()
 
 		cfg = Config{
-			Index:  i,
-			Width:  w,
-			Height: h,
-			FPS:    fps,
+			Index:      i,
+			API:        cfg.API,
+			Width:      width,
+			Height:     height,
+			FPS:        fps,
+			Format:     format,
+			IsExternal: i != 0,
 		}
 
 		cameras = append(cameras, cfg)
