@@ -108,3 +108,35 @@ func (c *Camera) ActualSize() (w, h int) {
 func (c *Camera) ActualFPS() float64 {
 	return c.cap.Get(gocv.VideoCaptureFPS)
 }
+
+// FindCameras searches for connected cameras and returns the Config list.
+func FindCameras() []Config {
+	var cameras []Config
+
+	for i := 0; i < 5; i++ {
+		cfg := Config{
+			Index: i,
+			API:   APIAny,
+		}
+
+		cam, err := Open(cfg)
+		if err != nil {
+			continue
+		}
+
+		w, h := cam.ActualSize()
+		fps := cam.ActualFPS()
+		cam.Close()
+
+		cfg = Config{
+			Index:  i,
+			Width:  w,
+			Height: h,
+			FPS:    fps,
+		}
+
+		cameras = append(cameras, cfg)
+	}
+
+	return cameras
+}
