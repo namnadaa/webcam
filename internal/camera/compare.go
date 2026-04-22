@@ -7,11 +7,13 @@ func CompareInternalExternal(cameras []Config) {
 	var internal *Config
 	var externals []Config
 
-	for _, cam := range cameras {
+	for i := range cameras {
+		cam := &cameras[i]
+
 		if cam.IsExternal {
-			externals = append(externals, cam)
+			externals = append(externals, *cam)
 		} else {
-			internal = &cam
+			internal = cam
 		}
 	}
 
