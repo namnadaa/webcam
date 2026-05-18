@@ -34,7 +34,7 @@ func main() {
 			return
 		}
 
-		width, height, fps, ok := camera.AskCameraSettings()
+		width, height, fps, changed := camera.AskCameraSettings()
 
 		cfg := camera.Config{
 			Index:  selected.Index,
@@ -44,7 +44,7 @@ func main() {
 			FPS:    selected.FPS,
 		}
 
-		if ok {
+		if changed {
 			cfg.Width = width
 			cfg.Height = height
 			cfg.FPS = fps
@@ -134,15 +134,35 @@ func main() {
 
 					y := 20
 					for _, line := range help {
-						gocv.PutText(
-							&f.Img,
-							line,
-							image.Pt(10, y),
-							gocv.FontHersheyPlain,
-							1.2,
-							color.RGBA{255, 255, 255, 0},
-							1,
-						)
+						drawText(&f.Img, line, 10, y, color.RGBA{255, 255, 255, 0})
+						y += 20
+					}
+
+					settings := []string{
+						fmt.Sprintf("Contrast: %.2f", params.BrightnessContrast.Alpha),
+						fmt.Sprintf("Brightness: %.0f", params.BrightnessContrast.Beta),
+						fmt.Sprintf("Blur Kernel: %d", params.Blur.Ksize),
+						fmt.Sprintf("Edge T1: %.0f", params.Edge.Threshold1),
+						fmt.Sprintf("Edge T2: %.0f", params.Edge.Threshold2),
+					}
+
+					y += 20
+					for _, line := range settings {
+						drawText(&f.Img, line, 10, y, color.RGBA{0, 255, 255, 0})
+						y += 20
+					}
+
+					statuses := []string{
+						fmt.Sprintf("[%s] Brightness/Contrast", onOff(stages[0].Enabled)),
+						fmt.Sprintf("[%s] Blur", onOff(stages[1].Enabled)),
+						fmt.Sprintf("[%s] Edge", onOff(stages[2].Enabled)),
+						fmt.Sprintf("[%s] Gray", onOff(stages[3].Enabled)),
+						fmt.Sprintf("[%s] Sharpen", onOff(stages[4].Enabled)),
+					}
+
+					y += 20
+					for _, line := range statuses {
+						drawText(&f.Img, line, 10, y, color.RGBA{0, 255, 0, 0})
 						y += 20
 					}
 
@@ -176,6 +196,7 @@ func main() {
 	}
 }
 
+// safeClose safely closes a channel if it has not been closed yet.
 func safeClose(ch chan struct{}) {
 	select {
 	case <-ch:
@@ -183,4 +204,35 @@ func safeClose(ch chan struct{}) {
 	default:
 		close(ch)
 	}
+}
+
+// drawText renders outlined text on an image for better visibility.
+func drawText(img *gocv.Mat, text string, x, y int, clr color.RGBA) {
+	gocv.PutText(
+		img,
+		text,
+		image.Pt(x, y),
+		gocv.FontHersheyPlain,
+		1.2,
+		color.RGBA{0, 0, 0, 0},
+		3,
+	)
+
+	gocv.PutText(
+		img,
+		text,
+		image.Pt(x, y),
+		gocv.FontHersheyPlain,
+		1.2,
+		clr,
+		1,
+	)
+}
+
+// onOff converts a boolean value into an ON/OFF status string.
+func onOff(v bool) string {
+	if v {
+		return "ON "
+	}
+	return "OFF"
 }
