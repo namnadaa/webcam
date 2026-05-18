@@ -28,9 +28,10 @@ func main() {
 		camera.CompareCameras(cams)
 		camera.PrintCameraList(cams)
 
-		selected := camera.SelectCamera(cams)
-		if selected == nil {
-			continue
+		selected, ok := camera.SelectCamera(cams)
+		if !ok {
+			fmt.Println("Exiting program")
+			return
 		}
 
 		width, height, fps, ok := camera.AskCameraSettings()
@@ -128,7 +129,7 @@ func main() {
 						"3: Toggle Edge",
 						"4: Toggle Gray",
 						"5: Toggle Sharpen",
-						"ESC: Quit",
+						"ESC: Camera menu",
 					}
 
 					y := 20

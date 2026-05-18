@@ -6,12 +6,16 @@ import (
 )
 
 // SelectCamera prompts user to select a valid camera index with input validation loop.
-func SelectCamera(cameras []Config) *Config {
+func SelectCamera(cameras []Config) (*Config, bool) {
 	var input string
 
 	for {
-		fmt.Print("Enter camera index: ")
+		fmt.Print("Enter camera index or 'q' to quit: ")
 		fmt.Scanln(&input)
+
+		if input == "q" || input == "Q" {
+			return nil, false
+		}
 
 		index, err := strconv.Atoi(input)
 		if err != nil {
@@ -25,7 +29,7 @@ func SelectCamera(cameras []Config) *Config {
 			continue
 		}
 
-		return cam
+		return cam, true
 	}
 }
 

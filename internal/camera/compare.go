@@ -49,6 +49,6 @@ func CompareCameras(cameras []Config) {
 func PrintCameraList(cameras []Config) {
 	fmt.Println("Available cameras:")
 	for _, cam := range cameras {
-		fmt.Printf("[%d] - %s\n", cam.Index+1, cam.Name)
+		fmt.Printf("[%d] - %s\n", cam.Index, cam.Name)
 	}
 }
