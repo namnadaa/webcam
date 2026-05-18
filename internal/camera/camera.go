@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"strings"
 
 	"gocv.io/x/gocv"
 )
@@ -19,13 +20,13 @@ const (
 
 // Config holds camera initialization parameters.
 type Config struct {
-	Index      int
-	API        API
-	Width      int
-	Height     int
-	FPS        float64
-	Format     string
-	IsExternal bool
+	Index  int
+	API    API
+	Width  int
+	Height int
+	FPS    float64
+	Format string
+	Name   string
 }
 
 // Camera represents an active video capture device.
@@ -130,38 +131,77 @@ func FourCCToString(fourcc int) string {
 func FindCameras() []Config {
 	var cameras []Config
 
-	for i := 0; i < 10; i++ {
+	const maxIndex = 20
+	const maxFails = 3
+
+	fails := 0
+
+	for i := 0; i < maxIndex; i++ {
 		cfg := Config{
 			Index: i,
 			API:   APIAny,
 		}
 
 		cam, err := Open(cfg)
-		if err != nil {
+		if err != nil || cam == nil {
+			fails++
+			if fails >= maxFails {
+				break
+			}
 			continue
 		}
+
+		fails = 0
 
 		width, height := cam.ActualSize()
 		fps := cam.ActualFPS()
 		format := FourCCToString(cam.PixelFormat())
-		if format == "\x00\x00\x00\x00" {
+		if format == "" || format == "\x00\x00\x00\x00" {
 			format = "Unknown"
 		}
 
 		_ = cam.Close()
 
 		cfg = Config{
-			Index:      i,
-			API:        cfg.API,
-			Width:      width,
-			Height:     height,
-			FPS:        fps,
-			Format:     format,
-			IsExternal: i != 0,
+			Index:  i,
+			API:    cfg.API,
+			Width:  width,
+			Height: height,
+			FPS:    fps,
+			Format: format,
+			Name:   fmt.Sprintf("Camera %d", len(cameras)+1),
 		}
 
 		cameras = append(cameras, cfg)
 	}
 
 	return cameras
+}
+
+// AskCameraSettings optionally prompts the user to override camera parameters and returns updated values.
+func AskCameraSettings() (int, int, float64, bool) {
+	var choice string
+
+	fmt.Print("\nChange camera settings? (y/n): ")
+	fmt.Scan(&choice)
+
+	choice = strings.ToLower(strings.TrimSpace(choice))
+
+	if choice != "y" && choice != "Y" {
+		return 0, 0, 0, false
+	}
+
+	var width, height int
+	var fps float64
+
+	fmt.Print("Enter width: ")
+	fmt.Scan(&width)
+
+	fmt.Print("Enter height: ")
+	fmt.Scan(&height)
+
+	fmt.Print("Enter FPS: ")
+	fmt.Scan(&fps)
+
+	return width, height, fps, true
 }

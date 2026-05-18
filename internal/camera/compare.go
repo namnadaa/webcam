@@ -2,64 +2,53 @@ package camera
 
 import "fmt"
 
-// CompareInternalExternal compares internal camera with all external cameras.
-func CompareInternalExternal(cameras []Config) {
-	var internal *Config
-	var externals []Config
-
-	for i := range cameras {
-		cam := &cameras[i]
-
-		if cam.IsExternal {
-			externals = append(externals, *cam)
-		} else {
-			internal = cam
-		}
-	}
-
-	if internal == nil {
-		fmt.Println("Internal camera not found")
+// CompareCameras prints a side-by-side comparison of available camera parameters.
+func CompareCameras(cameras []Config) {
+	if len(cameras) == 0 {
+		fmt.Println("No cameras found")
 		return
 	}
 
-	if len(externals) == 0 {
-		fmt.Println("External cameras not found")
-		return
-	}
+	base := cameras[0]
+	others := cameras[1:]
 
 	fmt.Println("\nCamera Comparison")
 	fmt.Println("===============================================================")
 
-	fmt.Printf("%-20s %-15s", "Parameter", "Internal")
-	for i := range externals {
-		fmt.Printf(" %-15s", fmt.Sprintf("External %d", externals[i].Index))
+	fmt.Printf("%-20s %-15s", "Name", base.Name)
+
+	for _, cam := range others {
+		fmt.Printf(" %-15s", cam.Name)
 	}
 	fmt.Println()
 
 	fmt.Println("---------------------------------------------------------------")
 
-	internalRes := fmt.Sprintf("%dx%d", internal.Width, internal.Height)
-	fmt.Printf("%-20s %-15s", "Resolution", internalRes)
-
-	for _, ext := range externals {
-		res := fmt.Sprintf("%dx%d", ext.Width, ext.Height)
-		fmt.Printf(" %-15s", res)
+	fmt.Printf("%-20s %-15s", "Resolution", fmt.Sprintf("%dx%d", base.Width, base.Height))
+	for _, cam := range others {
+		fmt.Printf(" %-15s", fmt.Sprintf("%dx%d", cam.Width, cam.Height))
 	}
 	fmt.Println()
 
-	fmt.Printf("%-20s %-15.2f", "FPS", internal.FPS)
-
-	for _, ext := range externals {
-		fmt.Printf(" %-15.2f", ext.FPS)
+	fmt.Printf("%-20s %-15.2f", "FPS", base.FPS)
+	for _, cam := range others {
+		fmt.Printf(" %-15.2f", cam.FPS)
 	}
 	fmt.Println()
 
-	fmt.Printf("%-20s %-15s", "Format", internal.Format)
-
-	for _, ext := range externals {
-		fmt.Printf(" %-15s", ext.Format)
+	fmt.Printf("%-20s %-15s", "Format", base.Format)
+	for _, cam := range others {
+		fmt.Printf(" %-15s", cam.Format)
 	}
 	fmt.Println()
 
 	fmt.Println("===============================================================")
+}
+
+// PrintCameraList prints available cameras with their type (internal/external).
+func PrintCameraList(cameras []Config) {
+	fmt.Println("Available cameras:")
+	for _, cam := range cameras {
+		fmt.Printf("[%d] - %s\n", cam.Index+1, cam.Name)
+	}
 }

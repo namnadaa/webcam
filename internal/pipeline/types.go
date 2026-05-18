@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"sync"
 	"time"
 	"webcam/internal/control"
 
@@ -25,4 +26,4 @@ type StageToggle struct {
 }
 
 // StageFunc defines a processing stage function type.
-type StageFunc func(prev <-chan Frame, done <-chan struct{}) <-chan Frame
+type StageFunc func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame

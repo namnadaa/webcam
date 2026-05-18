@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 	"webcam/internal/camera"
 	"webcam/internal/control"
@@ -11,10 +12,12 @@ import (
 )
 
 // ReadStage reads frames from a camera and sends them to the pipeline.
-func ReadStage(cam *camera.Camera, done <-chan struct{}) <-chan Frame {
+func ReadStage(cam *camera.Camera, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 	out := make(chan Frame)
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		defer close(out)
 
 		frame := gocv.NewMat()
@@ -25,14 +28,23 @@ func ReadStage(cam *camera.Camera, done <-chan struct{}) <-chan Frame {
 			case <-done:
 				return
 			default:
-				if ok := cam.Read(&frame); !ok || frame.Empty() {
-					continue
-				}
+			}
 
-				out <- Frame{
-					Img:  frame.Clone(),
-					Time: time.Now(),
-				}
+			if ok := cam.Read(&frame); !ok || frame.Empty() {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+
+			cloned := frame.Clone()
+
+			select {
+			case <-done:
+				cloned.Close()
+				return
+			case out <- Frame{
+				Img:  cloned,
+				Time: time.Now(),
+			}:
 			}
 		}
 	}()
@@ -49,10 +61,14 @@ func mapErr(stage string, err error) {
 
 // GrayStage converts frames to grayscale.
 func GrayStage() StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
+	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
+
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			defer close(next)
+
 			for {
 				select {
 				case f, ok := <-prev:
@@ -60,7 +76,12 @@ func GrayStage() StageFunc {
 						return
 					}
 					if f.Img.Channels() == 1 {
-						next <- f
+						select {
+						case <-done:
+							f.Close()
+							return
+						case next <- f:
+						}
 						continue
 					}
 					dst, err := filters.Gray(f.Img)
@@ -69,7 +90,16 @@ func GrayStage() StageFunc {
 						mapErr("gray", err)
 						continue
 					}
-					next <- Frame{Img: dst, Time: time.Now()}
+
+					select {
+					case <-done:
+						dst.Close()
+						return
+					case next <- Frame{
+						Img:  dst,
+						Time: time.Now(),
+					}:
+					}
 				case <-done:
 					return
 				}
@@ -81,10 +111,14 @@ func GrayStage() StageFunc {
 
 // BlurStage applies Gaussian blur.
 func BlurStage(p *control.BlurParams) StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
+	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
+
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			defer close(next)
+
 			for {
 				select {
 				case f, ok := <-prev:
@@ -97,7 +131,16 @@ func BlurStage(p *control.BlurParams) StageFunc {
 						mapErr("blur", err)
 						continue
 					}
-					next <- Frame{Img: dst, Time: time.Now()}
+
+					select {
+					case <-done:
+						dst.Close()
+						return
+					case next <- Frame{
+						Img:  dst,
+						Time: time.Now(),
+					}:
+					}
 				case <-done:
 					return
 				}
@@ -109,10 +152,14 @@ func BlurStage(p *control.BlurParams) StageFunc {
 
 // EdgeStage detects edges using the Canny algorithm.
 func EdgeStage(p *control.EdgeParams) StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
+	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
+
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			defer close(next)
+
 			for {
 				select {
 				case f, ok := <-prev:
@@ -125,7 +172,16 @@ func EdgeStage(p *control.EdgeParams) StageFunc {
 						mapErr("edge", err)
 						continue
 					}
-					next <- Frame{Img: dst, Time: time.Now()}
+
+					select {
+					case <-done:
+						dst.Close()
+						return
+					case next <- Frame{
+						Img:  dst,
+						Time: time.Now(),
+					}:
+					}
 				case <-done:
 					return
 				}
@@ -137,10 +193,14 @@ func EdgeStage(p *control.EdgeParams) StageFunc {
 
 // BrightnessContrastStage adjusts brightness and contrast.
 func BrightnessContrastStage(p *control.BrightnessContrastParams) StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
+	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
+
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			defer close(next)
+
 			for {
 				select {
 				case f, ok := <-prev:
@@ -153,7 +213,16 @@ func BrightnessContrastStage(p *control.BrightnessContrastParams) StageFunc {
 						mapErr("brightness_contrast", err)
 						continue
 					}
-					next <- Frame{Img: dst, Time: time.Now()}
+
+					select {
+					case <-done:
+						dst.Close()
+						return
+					case next <- Frame{
+						Img:  dst,
+						Time: time.Now(),
+					}:
+					}
 				case <-done:
 					return
 				}
@@ -165,10 +234,14 @@ func BrightnessContrastStage(p *control.BrightnessContrastParams) StageFunc {
 
 // SharpenStage increases image sharpness.
 func SharpenStage() StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
+	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
+
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			defer close(next)
+
 			for {
 				select {
 				case f, ok := <-prev:
@@ -181,7 +254,16 @@ func SharpenStage() StageFunc {
 						mapErr("sharpen", err)
 						continue
 					}
-					next <- Frame{Img: dst, Time: time.Now()}
+
+					select {
+					case <-done:
+						dst.Close()
+						return
+					case next <- Frame{
+						Img:  dst,
+						Time: time.Now(),
+					}:
+					}
 				case <-done:
 					return
 				}
@@ -193,10 +275,14 @@ func SharpenStage() StageFunc {
 
 // ToBGRStage an envelope from GRAY to BGR (for UI compatibility).
 func ToBGRStage() StageFunc {
-	return func(prev <-chan Frame, done <-chan struct{}) <-chan Frame {
+	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
+
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			defer close(next)
+
 			for {
 				select {
 				case f, ok := <-prev:
@@ -207,10 +293,26 @@ func ToBGRStage() StageFunc {
 						dst := gocv.NewMat()
 						_ = gocv.CvtColor(f.Img, &dst, gocv.ColorGrayToBGR)
 						f.Close()
-						next <- Frame{Img: dst, Time: time.Now()}
+
+						select {
+						case <-done:
+							dst.Close()
+							return
+						case next <- Frame{
+							Img:  dst,
+							Time: time.Now(),
+						}:
+						}
 						continue
 					}
-					next <- f
+
+					select {
+					case <-done:
+						f.Close()
+						return
+					case next <- f:
+					}
+
 				case <-done:
 					return
 				}
