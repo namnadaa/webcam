@@ -7,6 +7,7 @@ import (
 	"log"
 	"runtime"
 	"sync"
+	"time"
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
@@ -113,6 +114,13 @@ func main() {
 		}
 
 		var wg sync.WaitGroup
+
+		var (
+			frameCount int
+			fpsCam     float64
+			lastFPS    = time.Now()
+		)
+
 		runCamera := true
 		for runCamera {
 			done := make(chan struct{})
@@ -120,6 +128,18 @@ func main() {
 			frames := pipeline.BuildPipeline(cam, stages, params, done, &wg)
 
 			for f := range frames {
+				frameStart := time.Now()
+
+				frameCount++
+				elapsed := time.Since(lastFPS)
+
+				if elapsed >= time.Second {
+					fpsCam = float64(frameCount) / elapsed.Seconds()
+
+					frameCount = 0
+					lastFPS = time.Now()
+				}
+
 				func() {
 					defer f.Close()
 
@@ -164,6 +184,23 @@ func main() {
 					for _, line := range statuses {
 						drawText(&f.Img, line, 10, y, color.RGBA{0, 255, 0, 0})
 						y += 20
+					}
+
+					latency := time.Since(frameStart).Milliseconds()
+
+					stats := []string{
+						fmt.Sprintf("FPS: %.2f", fpsCam),
+						fmt.Sprintf("Latency: %d ms", latency),
+						fmt.Sprintf("Resolution: %dx%d", actualW, actualH),
+						fmt.Sprintf("Camera: %s", selected.Name),
+					}
+
+					statsY := 20
+					for _, line := range stats {
+						size := gocv.GetTextSize(line, gocv.FontHersheyPlain, 1.2, 1)
+						x := f.Img.Cols() - size.X - 10
+						drawText(&f.Img, line, x, statsY, color.RGBA{255, 165, 0, 0})
+						statsY += 20
 					}
 
 					win.IMShow(f.Img)
