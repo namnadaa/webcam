@@ -10,13 +10,14 @@ import (
 
 // HandleKeyboard — changes parameters by pressing buttons.
 // Returns false if the program needs to be terminated.
-func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State) (bool, bool) {
+func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State) (bool, bool, bool) {
 	key := win.WaitKey(1)
 	stageChanged := false
+	takeScreenshots := false
 
 	switch key {
 	case 27: // ESC
-		return false, false
+		return false, false, false
 
 	case 9: // TAB
 		uiState.ShowMenu = !uiState.ShowMenu
@@ -32,6 +33,9 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 
 	case int('c'), int('C'): // controls
 		uiState.ShowControls = !uiState.ShowControls
+
+	case int('x'), int('X'): // screenshot
+		takeScreenshots = true
 
 	case 49: // brightness/contrast
 		stages[0].Enabled = !stages[0].Enabled
@@ -86,5 +90,5 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 		params.Edge.Threshold2 += 5
 	}
 
-	return true, stageChanged
+	return true, stageChanged, takeScreenshots
 }

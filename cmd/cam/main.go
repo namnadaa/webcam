@@ -9,6 +9,7 @@ import (
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
+	"webcam/internal/media"
 	"webcam/internal/pipeline"
 	"webcam/internal/ui"
 
@@ -66,31 +67,31 @@ func main() {
 
 		stages := []pipeline.StageToggle{
 			{
-				Enabled: true,
+				Enabled: false,
 				Build: func(p *control.PipelineParams) pipeline.StageFunc {
 					return pipeline.BrightnessContrastStage(&p.BrightnessContrast)
 				},
 			},
 			{
-				Enabled: true,
+				Enabled: false,
 				Build: func(p *control.PipelineParams) pipeline.StageFunc {
 					return pipeline.BlurStage(&p.Blur)
 				},
 			},
 			{
-				Enabled: true,
+				Enabled: false,
 				Build: func(p *control.PipelineParams) pipeline.StageFunc {
 					return pipeline.EdgeStage(&p.Edge)
 				},
 			},
 			{
-				Enabled: true,
+				Enabled: false,
 				Build: func(p *control.PipelineParams) pipeline.StageFunc {
 					return pipeline.GrayStage()
 				},
 			},
 			{
-				Enabled: true,
+				Enabled: false,
 				Build: func(p *control.PipelineParams) pipeline.StageFunc {
 					return pipeline.SharpenStage()
 				},
@@ -171,12 +172,21 @@ func main() {
 
 					win.IMShow(f.Img)
 
-					cont, changed := keyboard.HandleKeyboard(win, params, stages, &uiState)
+					cont, changed, screenshot := keyboard.HandleKeyboard(win, params, stages, &uiState)
 					if !cont {
 						safeClose(done)
 						wg.Wait()
 						runCamera = false
 						return
+					}
+
+					if screenshot {
+						err := media.SaveScreenshot(f.Img)
+						if err != nil {
+							log.Printf("screenshot error: %v", err)
+						} else {
+							log.Printf("screenshot saved:")
+						}
 					}
 
 					if changed {
