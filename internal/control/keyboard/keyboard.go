@@ -3,19 +3,32 @@ package keyboard
 import (
 	"webcam/internal/control"
 	"webcam/internal/pipeline"
+	"webcam/internal/ui"
 
 	"gocv.io/x/gocv"
 )
 
 // HandleKeyboard — changes parameters by pressing buttons.
 // Returns false if the program needs to be terminated.
-func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle) (bool, bool) {
+func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State) (bool, bool) {
 	key := win.WaitKey(1)
 	stageChanged := false
 
 	switch key {
 	case 27: // ESC
 		return false, false
+
+	case 9: // TAB
+		uiState.ShowMenu = !uiState.ShowMenu
+
+	case int('p'), int('P'): // statistics
+		uiState.ShowStats = !uiState.ShowStats
+
+	case int('o'), int('O'): // settings
+		uiState.ShowSettings = !uiState.ShowSettings
+
+	case int('i'), int('I'): // statuses
+		uiState.ShowStatuses = !uiState.ShowStatuses
 
 	case 49: // brightness/contrast
 		stages[0].Enabled = !stages[0].Enabled

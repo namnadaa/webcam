@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"image"
-	"image/color"
 	"log"
 	"runtime"
 	"sync"
@@ -12,6 +10,7 @@ import (
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
 	"webcam/internal/pipeline"
+	"webcam/internal/ui"
 
 	"gocv.io/x/gocv"
 )
@@ -121,6 +120,13 @@ func main() {
 			lastFPS    = time.Now()
 		)
 
+		uiState := ui.State{
+			ShowMenu:     true,
+			ShowStats:    false,
+			ShowSettings: false,
+			ShowStatuses: false,
+		}
+
 		runCamera := true
 		for runCamera {
 			done := make(chan struct{})
@@ -128,8 +134,6 @@ func main() {
 			frames := pipeline.BuildPipeline(cam, stages, params, done, &wg)
 
 			for f := range frames {
-				frameStart := time.Now()
-
 				frameCount++
 				elapsed := time.Since(lastFPS)
 
@@ -143,69 +147,26 @@ func main() {
 				func() {
 					defer f.Close()
 
-					help := []string{
-						"1: Toggle Brightness/Contrast",
-						"2: Toggle Blur",
-						"3: Toggle Edge",
-						"4: Toggle Gray",
-						"5: Toggle Sharpen",
-						"ESC: Camera menu",
+					if uiState.ShowStats {
+						latency := time.Since(f.Time).Milliseconds()
+						ui.DrawStats(&f.Img, fpsCam, latency, actualW, actualH, selected.Name)
 					}
 
-					y := 20
-					for _, line := range help {
-						drawText(&f.Img, line, 10, y, color.RGBA{255, 255, 255, 0})
-						y += 20
+					if uiState.ShowSettings {
+						ui.DrawSettings(&f.Img, params)
 					}
 
-					settings := []string{
-						fmt.Sprintf("Contrast: %.2f", params.BrightnessContrast.Alpha),
-						fmt.Sprintf("Brightness: %.0f", params.BrightnessContrast.Beta),
-						fmt.Sprintf("Blur Kernel: %d", params.Blur.Ksize),
-						fmt.Sprintf("Edge T1: %.0f", params.Edge.Threshold1),
-						fmt.Sprintf("Edge T2: %.0f", params.Edge.Threshold2),
+					if uiState.ShowStatuses {
+						ui.DrawStatuses(&f.Img, stages)
 					}
 
-					y += 20
-					for _, line := range settings {
-						drawText(&f.Img, line, 10, y, color.RGBA{0, 255, 255, 0})
-						y += 20
-					}
-
-					statuses := []string{
-						fmt.Sprintf("[%s] Brightness/Contrast", onOff(stages[0].Enabled)),
-						fmt.Sprintf("[%s] Blur", onOff(stages[1].Enabled)),
-						fmt.Sprintf("[%s] Edge", onOff(stages[2].Enabled)),
-						fmt.Sprintf("[%s] Gray", onOff(stages[3].Enabled)),
-						fmt.Sprintf("[%s] Sharpen", onOff(stages[4].Enabled)),
-					}
-
-					y += 20
-					for _, line := range statuses {
-						drawText(&f.Img, line, 10, y, color.RGBA{0, 255, 0, 0})
-						y += 20
-					}
-
-					latency := time.Since(frameStart).Milliseconds()
-
-					stats := []string{
-						fmt.Sprintf("FPS: %.2f", fpsCam),
-						fmt.Sprintf("Latency: %d ms", latency),
-						fmt.Sprintf("Resolution: %dx%d", actualW, actualH),
-						fmt.Sprintf("Camera: %s", selected.Name),
-					}
-
-					statsY := 20
-					for _, line := range stats {
-						size := gocv.GetTextSize(line, gocv.FontHersheyPlain, 1.2, 1)
-						x := f.Img.Cols() - size.X - 10
-						drawText(&f.Img, line, x, statsY, color.RGBA{255, 165, 0, 0})
-						statsY += 20
+					if uiState.ShowMenu {
+						ui.DrawMenu(&f.Img)
 					}
 
 					win.IMShow(f.Img)
 
-					cont, changed := keyboard.HandleKeyboard(win, params, stages)
+					cont, changed := keyboard.HandleKeyboard(win, params, stages, &uiState)
 					if !cont {
 						safeClose(done)
 						wg.Wait()
@@ -241,35 +202,4 @@ func safeClose(ch chan struct{}) {
 	default:
 		close(ch)
 	}
-}
-
-// drawText renders outlined text on an image for better visibility.
-func drawText(img *gocv.Mat, text string, x, y int, clr color.RGBA) {
-	gocv.PutText(
-		img,
-		text,
-		image.Pt(x, y),
-		gocv.FontHersheyPlain,
-		1.2,
-		color.RGBA{0, 0, 0, 0},
-		3,
-	)
-
-	gocv.PutText(
-		img,
-		text,
-		image.Pt(x, y),
-		gocv.FontHersheyPlain,
-		1.2,
-		clr,
-		1,
-	)
-}
-
-// onOff converts a boolean value into an ON/OFF status string.
-func onOff(v bool) string {
-	if v {
-		return "ON "
-	}
-	return "OFF"
 }
