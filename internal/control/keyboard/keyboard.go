@@ -21,14 +21,17 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	case 9: // TAB
 		uiState.ShowMenu = !uiState.ShowMenu
 
-	case int('p'), int('P'): // statistics
+	case int('t'), int('T'): // statistics
 		uiState.ShowStats = !uiState.ShowStats
 
-	case int('o'), int('O'): // settings
+	case int('p'), int('P'): // settings
 		uiState.ShowSettings = !uiState.ShowSettings
 
-	case int('i'), int('I'): // statuses
+	case int('f'), int('F'): // statuses
 		uiState.ShowStatuses = !uiState.ShowStatuses
+
+	case int('c'), int('C'): // controls
+		uiState.ShowControls = !uiState.ShowControls
 
 	case 49: // brightness/contrast
 		stages[0].Enabled = !stages[0].Enabled

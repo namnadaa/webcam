@@ -125,6 +125,7 @@ func main() {
 			ShowStats:    false,
 			ShowSettings: false,
 			ShowStatuses: false,
+			ShowControls: false,
 		}
 
 		runCamera := true
@@ -147,6 +148,10 @@ func main() {
 				func() {
 					defer f.Close()
 
+					if uiState.ShowMenu {
+						ui.DrawMenu(&f.Img)
+					}
+
 					if uiState.ShowStats {
 						latency := time.Since(f.Time).Milliseconds()
 						ui.DrawStats(&f.Img, fpsCam, latency, actualW, actualH, selected.Name)
@@ -160,8 +165,8 @@ func main() {
 						ui.DrawStatuses(&f.Img, stages)
 					}
 
-					if uiState.ShowMenu {
-						ui.DrawMenu(&f.Img)
+					if uiState.ShowControls {
+						ui.DrawControls(&f.Img)
 					}
 
 					win.IMShow(f.Img)

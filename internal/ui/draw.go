@@ -23,6 +23,7 @@ const (
 	statsY    = 20
 	settingsY = 120
 	statusesY = 240
+	controlsY = 360
 )
 
 // drawText renders outlined text on an image for better visibility.
@@ -59,7 +60,7 @@ func drawRightText(img *gocv.Mat, text string, y int, clr color.RGBA) {
 // DrawMenu renders the interactive control menu overlay.
 func DrawMenu(img *gocv.Mat) {
 	menu := []string{
-		"=========== MENU ===========",
+		"======== MENU ========",
 		"",
 		"[1] Toggle Brightness/Contrast",
 		"[2] Toggle Blur",
@@ -67,10 +68,10 @@ func DrawMenu(img *gocv.Mat) {
 		"[4] Toggle Gray",
 		"[5] Toggle Sharpen",
 		"",
-		"[P] Toggle Statistics",
-		"[O] Toggle Settings",
-		"[I] Toggle Statuses",
-		"[U] Toggle Control",
+		"[T] Toggle Statistics",
+		"[P] Toggle Parameters",
+		"[F] Toggle Filters",
+		"[C] Toggle Controls",
 		"",
 		"[S] Screenshot",
 		"[V] Video Recording",
@@ -106,7 +107,6 @@ func DrawStats(img *gocv.Mat, fps float64, latency int64, width int, height int,
 
 	for _, line := range stats {
 		drawRightText(img, line, y, color.RGBA{255, 165, 0, 0})
-
 		y += lineHeight
 	}
 }
@@ -114,8 +114,8 @@ func DrawStats(img *gocv.Mat, fps float64, latency int64, width int, height int,
 // DrawSettings renders current filter settings.
 func DrawSettings(img *gocv.Mat, params *control.PipelineParams) {
 	settings := []string{
-		fmt.Sprintf("Contrast: %.2f", params.BrightnessContrast.Alpha),
 		fmt.Sprintf("Brightness: %.0f", params.BrightnessContrast.Beta),
+		fmt.Sprintf("Contrast: %.2f", params.BrightnessContrast.Alpha),
 		fmt.Sprintf("Blur Kernel: %d", params.Blur.Ksize),
 		fmt.Sprintf("Edge T1: %.0f", params.Edge.Threshold1),
 		fmt.Sprintf("Edge T2: %.0f", params.Edge.Threshold2),
@@ -125,7 +125,6 @@ func DrawSettings(img *gocv.Mat, params *control.PipelineParams) {
 
 	for _, line := range settings {
 		drawRightText(img, line, y, color.RGBA{0, 255, 255, 0})
-
 		y += lineHeight
 	}
 }
@@ -144,7 +143,24 @@ func DrawStatuses(img *gocv.Mat, stages []pipeline.StageToggle) {
 
 	for _, line := range statuses {
 		drawRightText(img, line, y, color.RGBA{0, 255, 0, 0})
+		y += lineHeight
+	}
+}
 
+// DrawControls renders camera control bindings.
+func DrawControls(img *gocv.Mat) {
+	controls := []string{
+		"Brightness: W / S",
+		"Contrast:   A / D",
+		"Blur Size:  E / Q",
+		"Edge T1:    J / K",
+		"Edge T2:    N / M",
+	}
+
+	y := controlsY
+
+	for _, line := range controls {
+		drawRightText(img, line, y, color.RGBA{200, 200, 200, 0})
 		y += lineHeight
 	}
 }

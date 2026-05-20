@@ -6,4 +6,5 @@ type State struct {
 	ShowStats    bool
 	ShowSettings bool
 	ShowStatuses bool
+	ShowControls bool
 }
