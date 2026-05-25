@@ -129,6 +129,11 @@ func main() {
 			ShowControls: false,
 		}
 
+		mediaState := media.State{
+			Screenshot: false,
+		}
+		recorder := &media.VideoRecorder{}
+
 		runCamera := true
 		for runCamera {
 			done := make(chan struct{})
@@ -149,30 +154,8 @@ func main() {
 				func() {
 					defer f.Close()
 
-					if uiState.ShowMenu {
-						ui.DrawMenu(&f.Img)
-					}
+					cont, changed := keyboard.HandleKeyboard(win, params, stages, &uiState, &mediaState)
 
-					if uiState.ShowStats {
-						latency := time.Since(f.Time).Milliseconds()
-						ui.DrawStats(&f.Img, fpsCam, latency, actualW, actualH, selected.Name)
-					}
-
-					if uiState.ShowSettings {
-						ui.DrawSettings(&f.Img, params)
-					}
-
-					if uiState.ShowStatuses {
-						ui.DrawStatuses(&f.Img, stages)
-					}
-
-					if uiState.ShowControls {
-						ui.DrawControls(&f.Img)
-					}
-
-					win.IMShow(f.Img)
-
-					cont, changed, screenshot := keyboard.HandleKeyboard(win, params, stages, &uiState)
 					if !cont {
 						safeClose(done)
 						wg.Wait()
@@ -180,14 +163,25 @@ func main() {
 						return
 					}
 
-					if screenshot {
-						err := media.SaveScreenshot(f.Img)
-						if err != nil {
-							log.Printf("screenshot error: %v", err)
-						} else {
-							log.Printf("screenshot saved:")
-						}
-					}
+					media.UpdateRecorder(recorder, &mediaState, actualFPS, actualW, actualH)
+
+					media.HandleScreenshot(&mediaState, f.Img)
+
+					ui.RenderOverlay(
+						&f.Img,
+						uiState,
+						params,
+						stages,
+						fpsCam,
+						actualW,
+						actualH,
+						selected.Name,
+						f.Time,
+					)
+
+					recorder.Write(f.Img)
+
+					win.IMShow(f.Img)
 
 					if changed {
 						safeClose(done)

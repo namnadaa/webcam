@@ -2,6 +2,7 @@ package keyboard
 
 import (
 	"webcam/internal/control"
+	"webcam/internal/media"
 	"webcam/internal/pipeline"
 	"webcam/internal/ui"
 
@@ -10,14 +11,13 @@ import (
 
 // HandleKeyboard — changes parameters by pressing buttons.
 // Returns false if the program needs to be terminated.
-func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State) (bool, bool, bool) {
+func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State, mediaState *media.State) (bool, bool) {
 	key := win.WaitKey(1)
 	stageChanged := false
-	takeScreenshots := false
 
 	switch key {
 	case 27: // ESC
-		return false, false, false
+		return false, false
 
 	case 9: // TAB
 		uiState.ShowMenu = !uiState.ShowMenu
@@ -35,7 +35,11 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 		uiState.ShowControls = !uiState.ShowControls
 
 	case int('x'), int('X'): // screenshot
-		takeScreenshots = true
+		mediaState.Screenshot = true
+
+	case int('r'), int('R'): // recording video
+		mediaState.Recording = !mediaState.Recording
+		stageChanged = true
 
 	case 49: // brightness/contrast
 		stages[0].Enabled = !stages[0].Enabled
@@ -90,5 +94,5 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 		params.Edge.Threshold2 += 5
 	}
 
-	return true, stageChanged, takeScreenshots
+	return true, stageChanged
 }
