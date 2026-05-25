@@ -10,6 +10,15 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// RecorderEvent represents recorder state changes.
+type RecorderEvent int
+
+const (
+	RecorderNone RecorderEvent = iota
+	RecorderStarted
+	RecorderStopped
+)
+
 // VideoRecorder handles video recording using OpenCV VideoWriter.
 type VideoRecorder struct {
 	writer    *gocv.VideoWriter
@@ -24,7 +33,7 @@ func (v *VideoRecorder) Start(filename string, fps float64, width, height int) {
 
 	w, err := gocv.VideoWriterFile(filename, "MJPG", fps, width, height, true)
 	if err != nil {
-		slog.Error("video start error: %v", err)
+		slog.Error("video start error", "err", err)
 		return
 	}
 
@@ -36,7 +45,7 @@ func (v *VideoRecorder) Start(filename string, fps float64, width, height int) {
 	v.writer = w
 	v.recording = true
 
-	slog.Info("video recording started:", filename)
+	slog.Info("video recording started", filename)
 }
 
 // Write writes a single frame into the video stream.
@@ -67,7 +76,7 @@ func (v *VideoRecorder) IsRecording() bool {
 }
 
 // UpdateRecorder controls recording lifecycle based on state.
-func UpdateRecorder(recorder *VideoRecorder, state *State, fps float64, width, height int) {
+func UpdateRecorder(recorder *VideoRecorder, state *State, fps float64, width, height int) RecorderEvent {
 	safeFPS := fps
 	if safeFPS <= 1 {
 		safeFPS = 30
@@ -76,8 +85,8 @@ func UpdateRecorder(recorder *VideoRecorder, state *State, fps float64, width, h
 	if state.Recording && !recorder.IsRecording() {
 		err := os.MkdirAll("videos", 0755)
 		if err != nil {
-			slog.Error("video dir error: %v", err)
-			return
+			slog.Error("video dir error", "err", err)
+			return RecorderNone
 		}
 
 		filename := fmt.Sprintf(
@@ -88,9 +97,13 @@ func UpdateRecorder(recorder *VideoRecorder, state *State, fps float64, width, h
 		path := filepath.Join("videos", filename)
 
 		recorder.Start(path, safeFPS, width, height)
+		return RecorderStarted
 	}
 
 	if !state.Recording && recorder.IsRecording() {
 		recorder.Stop()
+		return RecorderStopped
 	}
+
+	return RecorderNone
 }

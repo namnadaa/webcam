@@ -165,6 +165,14 @@ func DrawControls(img *gocv.Mat) {
 	}
 }
 
+// DrawNotification renders notification text on frame.
+func DrawNotification(img *gocv.Mat, text string) {
+	x := leftPadding
+	y := img.Rows() - topPadding
+
+	drawText(img, text, x, y, color.RGBA{255, 0, 0, 0})
+}
+
 // onOff converts a boolean value into an ON/OFF status string.
 func onOff(v bool) string {
 	if v {

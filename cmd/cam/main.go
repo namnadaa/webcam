@@ -21,7 +21,7 @@ import (
 func main() {
 	err := logger.Init()
 	if err != nil {
-		slog.Error("logger init error:", err)
+		slog.Error("camera not opened", "err", err)
 		return
 	}
 
@@ -61,7 +61,7 @@ func main() {
 
 		cam, err := camera.Open(cfg)
 		if err != nil {
-			slog.Error("camera not opened: %v", err)
+			slog.Error("camera not opened", "err", err)
 			os.Exit(1)
 		}
 
@@ -70,9 +70,12 @@ func main() {
 		actualW, actualH := cam.ActualSize()
 		actualFPS := cam.ActualFPS()
 
-		slog.Info("Applied settings:")
-		slog.Info("Resolution: %dx%d\n", actualW, actualH)
-		slog.Info("FPS: %.2f\n", actualFPS)
+		slog.Info(
+			"camera settings applied",
+			"width", actualW,
+			"height", actualH,
+			"fps", actualFPS,
+		)
 
 		stages := []pipeline.StageToggle{
 			{
@@ -172,9 +175,18 @@ func main() {
 						return
 					}
 
-					media.UpdateRecorder(recorder, &mediaState, actualFPS, actualW, actualH)
+					event := media.UpdateRecorder(recorder, &mediaState, actualFPS, actualW, actualH)
 
-					media.HandleScreenshot(&mediaState, f.Img)
+					switch event {
+					case media.RecorderStarted:
+						uiState.ShowNotification("Recording started", 2*time.Second)
+					case media.RecorderStopped:
+						uiState.ShowNotification("Recording stopped", 2*time.Second)
+					}
+
+					if media.HandleScreenshot(&mediaState, f.Img) {
+						uiState.ShowNotification("Screenshot saved", 2*time.Second)
+					}
 
 					ui.RenderOverlay(
 						&f.Img,

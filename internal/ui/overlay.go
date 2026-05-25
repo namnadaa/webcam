@@ -39,4 +39,8 @@ func RenderOverlay(
 	if state.ShowControls {
 		DrawControls(img)
 	}
+
+	if time.Now().Before(state.Notification.Until) {
+		DrawNotification(img, state.Notification.Message)
+	}
 }

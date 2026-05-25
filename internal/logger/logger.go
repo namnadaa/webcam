@@ -2,7 +2,6 @@ package logger
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -32,7 +31,7 @@ func Init() error {
 		return err
 	}
 
-	writer := io.MultiWriter(os.Stdout, file)
+	writer := file
 
 	handler := slog.NewTextHandler(writer, &slog.HandlerOptions{
 		Level: slog.LevelInfo,

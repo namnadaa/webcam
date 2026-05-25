@@ -14,7 +14,7 @@ import (
 func SaveScreenshot(img gocv.Mat) error {
 	err := os.MkdirAll("screenshots", 0755)
 	if err != nil {
-		slog.Error("screenshots dir error: %v", err)
+		slog.Error("screenshots dir error", "err", err)
 		return err
 	}
 
@@ -34,17 +34,20 @@ func SaveScreenshot(img gocv.Mat) error {
 }
 
 // HandleScreenshot saves frame if screenshot flag is set.
-func HandleScreenshot(state *State, frame gocv.Mat) {
+func HandleScreenshot(state *State, frame gocv.Mat) bool {
 	if !state.Screenshot {
-		return
+		return false
 	}
 
 	err := SaveScreenshot(frame)
 	if err != nil {
-		slog.Error("screenshot error: %v", err)
-	} else {
-		slog.Info("screenshot saved")
-	}
+		slog.Error("screenshots error", "err", err)
+		state.Screenshot = false
+		return false
 
+	}
+	slog.Info("screenshot saved")
 	state.Screenshot = false
+
+	return true
 }
