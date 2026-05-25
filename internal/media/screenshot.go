@@ -2,7 +2,7 @@ package media
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,7 +14,7 @@ import (
 func SaveScreenshot(img gocv.Mat) error {
 	err := os.MkdirAll("screenshots", 0755)
 	if err != nil {
-		log.Printf("screenshots dir error: %v", err)
+		slog.Error("screenshots dir error: %v", err)
 		return err
 	}
 
@@ -40,11 +40,10 @@ func HandleScreenshot(state *State, frame gocv.Mat) {
 	}
 
 	err := SaveScreenshot(frame)
-
 	if err != nil {
-		log.Printf("screenshot error: %v", err)
+		slog.Error("screenshot error: %v", err)
 	} else {
-		log.Printf("screenshot saved")
+		slog.Info("screenshot saved")
 	}
 
 	state.Screenshot = false

@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"runtime"
 	"sync"
 	"time"
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
+	"webcam/internal/logger"
 	"webcam/internal/media"
 	"webcam/internal/pipeline"
 	"webcam/internal/ui"
@@ -17,12 +19,18 @@ import (
 )
 
 func main() {
+	err := logger.Init()
+	if err != nil {
+		slog.Error("logger init error:", err)
+		return
+	}
+
 	runtime.LockOSThread()
 
 	for {
 		cams := camera.FindCameras()
 		if len(cams) == 0 {
-			fmt.Println("No cameras found")
+			slog.Warn("No cameras found")
 			return
 		}
 
@@ -53,7 +61,8 @@ func main() {
 
 		cam, err := camera.Open(cfg)
 		if err != nil {
-			log.Fatalf("camera not opened: %v", err)
+			slog.Error("camera not opened: %v", err)
+			os.Exit(1)
 		}
 
 		win := gocv.NewWindow("Camera")
@@ -61,9 +70,9 @@ func main() {
 		actualW, actualH := cam.ActualSize()
 		actualFPS := cam.ActualFPS()
 
-		fmt.Println("Applied settings:")
-		fmt.Printf("Resolution: %dx%d\n", actualW, actualH)
-		fmt.Printf("FPS: %.2f\n", actualFPS)
+		slog.Info("Applied settings:")
+		slog.Info("Resolution: %dx%d\n", actualW, actualH)
+		slog.Info("FPS: %.2f\n", actualFPS)
 
 		stages := []pipeline.StageToggle{
 			{

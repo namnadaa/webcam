@@ -2,7 +2,7 @@ package media
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,19 +24,19 @@ func (v *VideoRecorder) Start(filename string, fps float64, width, height int) {
 
 	w, err := gocv.VideoWriterFile(filename, "MJPG", fps, width, height, true)
 	if err != nil {
-		log.Printf("video start error: %v", err)
+		slog.Error("video start error: %v", err)
 		return
 	}
 
 	if w == nil {
-		log.Println("VideoWriter is NIL")
+		slog.Warn("VideoWriter is NIL")
 		return
 	}
 
 	v.writer = w
 	v.recording = true
 
-	log.Println("video recording started:", filename)
+	slog.Info("video recording started:", filename)
 }
 
 // Write writes a single frame into the video stream.
@@ -58,7 +58,7 @@ func (v *VideoRecorder) Stop() {
 	v.writer = nil
 	v.recording = false
 
-	log.Println("video recording stopped")
+	slog.Info("video recording stopped")
 }
 
 // IsRecording returns current recording state.
@@ -76,7 +76,7 @@ func UpdateRecorder(recorder *VideoRecorder, state *State, fps float64, width, h
 	if state.Recording && !recorder.IsRecording() {
 		err := os.MkdirAll("videos", 0755)
 		if err != nil {
-			log.Printf("video dir error: %v", err)
+			slog.Error("video dir error: %v", err)
 			return
 		}
 
