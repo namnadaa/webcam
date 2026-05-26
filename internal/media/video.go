@@ -45,7 +45,7 @@ func (v *VideoRecorder) Start(filename string, fps float64, width, height int) {
 	v.writer = w
 	v.recording = true
 
-	slog.Info("video recording started", filename)
+	slog.Info("video recording started", "file", filename)
 }
 
 // Write writes a single frame into the video stream.
