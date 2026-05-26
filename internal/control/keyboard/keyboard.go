@@ -1,7 +1,7 @@
 package keyboard
 
 import (
-	"fmt"
+	"webcam/internal/actions"
 	"webcam/internal/control"
 	"webcam/internal/media"
 	"webcam/internal/pipeline"
@@ -10,47 +10,32 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// Action represents keyboard actions.
-type Action int
-
-const (
-	ActionNone Action = iota
-	ActionNextResolution
-	ActionPrevResolution
-	ActionNextFPS
-	ActionPrevFPS
-)
-
 // HandleKeyboard — changes parameters by pressing buttons.
 // Returns false if the program needs to be terminated.
-func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State, mediaState *media.State) (bool, bool, Action) {
+func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State, mediaState *media.State) (bool, bool, actions.CameraAction) {
 	key := win.WaitKey(1)
 	stageChanged := false
-	action := ActionNone
-
-	if key != -1 {
-		fmt.Println(key)
-	}
+	action := actions.ActionNone
 
 	switch key {
 	case 27: // ESC
-		return false, false, ActionNone
+		return false, false, actions.ActionNone
 
 	case 9: // TAB
 		uiState.ShowMenu = !uiState.ShowMenu
 
 	// macOS OpenCV arrow key codes
 	case 2: // LEFT
-		action = ActionPrevResolution
+		action = actions.ActionPrevResolution
 
 	case 3: // RIGHT
-		action = ActionNextResolution
+		action = actions.ActionNextResolution
 
 	case 0: // UP
-		action = ActionNextFPS
+		action = actions.ActionNextFPS
 
 	case 1: // DOWN
-		action = ActionPrevFPS
+		action = actions.ActionPrevFPS
 
 	case int('t'), int('T'): // statistics
 		uiState.ShowStats = !uiState.ShowStats

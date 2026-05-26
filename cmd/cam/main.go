@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"runtime"
 	"sync"
 	"time"
+	"webcam/internal/actions"
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
@@ -69,7 +69,7 @@ func main() {
 			cam, err := camera.Open(cfg)
 			if err != nil {
 				slog.Error("camera not opened", "err", err)
-				os.Exit(1)
+				break
 			}
 
 			win := gocv.NewWindow("Camera")
@@ -153,7 +153,6 @@ func main() {
 
 			recorder := &media.VideoRecorder{}
 
-			cameraChanged := false
 			runCamera := true
 			for runCamera {
 				done := make(chan struct{})
@@ -183,57 +182,12 @@ func main() {
 							return
 						}
 
-						switch action {
-						case keyboard.ActionNextResolution:
-							resolutionIndex++
-
-							if resolutionIndex >= len(camera.Resolutions) {
-								resolutionIndex = 0
-							}
-
-							cameraChanged = true
-
-						case keyboard.ActionPrevResolution:
-							resolutionIndex--
-
-							if resolutionIndex < 0 {
-								resolutionIndex = len(camera.Resolutions) - 1
-							}
-
-							cameraChanged = true
-
-						case keyboard.ActionNextFPS:
-							fpsIndex++
-
-							if fpsIndex >= len(camera.FPSPresets) {
-								fpsIndex = 0
-							}
-
-							cameraChanged = true
-
-						case keyboard.ActionPrevFPS:
-							fpsIndex--
-
-							if fpsIndex < 0 {
-								fpsIndex = len(camera.FPSPresets) - 1
-							}
-
-							cameraChanged = true
-						}
-
+						cameraChanged := actions.HandleAction(action, &cfg, &resolutionIndex, &fpsIndex)
 						if cameraChanged {
-							resolution := camera.Resolutions[resolutionIndex]
-
-							cfg.Width = resolution.Width
-							cfg.Height = resolution.Height
-							cfg.FPS = camera.FPSPresets[fpsIndex]
-
-							cameraChanged = false
-							restartCamera = true
-
 							safeClose(done)
 							wg.Wait()
 
+							restartCamera = true
 							runCamera = false
 							return
 						}
