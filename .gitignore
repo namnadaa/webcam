@@ -4,3 +4,6 @@
 /screenshots/
 /videos/
 /logs/
+/build/
+*.exe
+*.zip

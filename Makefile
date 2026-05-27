@@ -1,3 +1,8 @@
+# ==== APP ====
+APP_NAME=webcam
+BUILD_DIR=build
+MAIN=./cmd/cam
+
 # Get macOS SDK path (required for CGO)
 SDKROOT := $(shell xcrun --show-sdk-path)
 # Path to C++ standard library headers
@@ -11,6 +16,9 @@ export CPATH
 export PKG_CONFIG_PATH
 export CGO_ENABLED=1
 
+.PHONY: test test-pkg test-func run build build-mac build-win clean release 
+
+# ==== TESTS ====
 # Run all tests in all packages (timeout 30s)
 test:
 	@echo "Using SDKROOT=$(SDKROOT)"
@@ -28,7 +36,32 @@ test-func:
 	@echo "Using SDKROOT=$(SDKROOT)"
 	CGO_ENABLED=1 go test -v -timeout 30s -run ^$(FUNC)$$ $(PKG)
 
+# ==== RUN ====
 # Run the main application
 run:
 	@echo "Using SDKROOT=$(SDKROOT)"
-	go run ./cmd/cam
+	go run $(MAIN)
+
+# ==== BUILD ====
+build: build-mac
+
+# Build macOS application (ARM64)
+# Compiles the project for Apple Silicon (M1/M2/M3) Macs
+# and signs the binary for local execution (codesign -s -)
+build-mac:
+	mkdir -p $(BUILD_DIR)
+	GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(APP_NAME)-macos $(MAIN)
+	codesign -s - $(BUILD_DIR)/$(APP_NAME)-macos
+
+# ==== CLEAN ====
+# Remove all build artifacts
+# Deletes the entire build directory
+clean:
+	rm -rf $(BUILD_DIR)
+
+# ==== RELEASE ====
+# Create a macOS release package
+# Builds the macOS binary, copies README, and zips everything into a release archive
+release: clean build
+	cp README.md $(BUILD_DIR)/
+	cd $(BUILD_DIR) && zip $(APP_NAME)-release.zip webcam-macos README.md
