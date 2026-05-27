@@ -10,6 +10,7 @@ import (
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
+	"webcam/internal/helpers"
 	"webcam/internal/logger"
 	"webcam/internal/media"
 	"webcam/internal/pipeline"
@@ -84,52 +85,10 @@ func main() {
 				"fps", actualFPS,
 			)
 
-			stages := []pipeline.StageToggle{
-				{
-					Enabled: false,
-					Build: func(p *control.PipelineParams) pipeline.StageFunc {
-						return pipeline.BrightnessContrastStage(&p.BrightnessContrast)
-					},
-				},
-				{
-					Enabled: false,
-					Build: func(p *control.PipelineParams) pipeline.StageFunc {
-						return pipeline.BlurStage(&p.Blur)
-					},
-				},
-				{
-					Enabled: false,
-					Build: func(p *control.PipelineParams) pipeline.StageFunc {
-						return pipeline.EdgeStage(&p.Edge)
-					},
-				},
-				{
-					Enabled: false,
-					Build: func(p *control.PipelineParams) pipeline.StageFunc {
-						return pipeline.GrayStage()
-					},
-				},
-				{
-					Enabled: false,
-					Build: func(p *control.PipelineParams) pipeline.StageFunc {
-						return pipeline.SharpenStage()
-					},
-				},
-			}
-
-			params := &control.PipelineParams{
-				BrightnessContrast: control.BrightnessContrastParams{
-					Alpha: 1.0,
-					Beta:  0,
-				},
-				Blur: control.BlurParams{
-					Ksize: 5,
-				},
-				Edge: control.EdgeParams{
-					Threshold1: 50,
-					Threshold2: 150,
-				},
-			}
+			stages := pipeline.NewStages()
+			params := control.NewPipelineParams()
+			uiState := ui.NewUIState()
+			mediaState := media.NewMediaState()
 
 			var wg sync.WaitGroup
 
@@ -138,18 +97,6 @@ func main() {
 				fpsCam     float64
 				lastFPS    = time.Now()
 			)
-
-			uiState := ui.State{
-				ShowMenu:     true,
-				ShowStats:    false,
-				ShowSettings: false,
-				ShowStatuses: false,
-				ShowControls: false,
-			}
-
-			mediaState := media.State{
-				Screenshot: false,
-			}
 
 			recorder := &media.VideoRecorder{}
 
@@ -160,15 +107,7 @@ func main() {
 				frames := pipeline.BuildPipeline(cam, stages, params, done, &wg)
 
 				for f := range frames {
-					frameCount++
-					elapsed := time.Since(lastFPS)
-
-					if elapsed >= time.Second {
-						fpsCam = float64(frameCount) / elapsed.Seconds()
-
-						frameCount = 0
-						lastFPS = time.Now()
-					}
+					helpers.UpdateFPS(&frameCount, &lastFPS, &fpsCam)
 
 					func() {
 						defer f.Close()

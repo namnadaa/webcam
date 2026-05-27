@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"webcam/internal/control"
+	"webcam/internal/helpers"
 	"webcam/internal/pipeline"
 
 	"gocv.io/x/gocv"
@@ -132,11 +133,11 @@ func DrawSettings(img *gocv.Mat, params *control.PipelineParams) {
 // DrawStatuses renders filter enable statuses.
 func DrawStatuses(img *gocv.Mat, stages []pipeline.StageToggle) {
 	statuses := []string{
-		fmt.Sprintf("Brightness/Contrast [%s]", onOff(stages[0].Enabled)),
-		fmt.Sprintf("Blur [%s]", onOff(stages[1].Enabled)),
-		fmt.Sprintf("Edge [%s]", onOff(stages[2].Enabled)),
-		fmt.Sprintf("Gray [%s]", onOff(stages[3].Enabled)),
-		fmt.Sprintf("Sharpen [%s]", onOff(stages[4].Enabled)),
+		fmt.Sprintf("Brightness/Contrast [%s]", helpers.OnOff(stages[0].Enabled)),
+		fmt.Sprintf("Blur [%s]", helpers.OnOff(stages[1].Enabled)),
+		fmt.Sprintf("Edge [%s]", helpers.OnOff(stages[2].Enabled)),
+		fmt.Sprintf("Gray [%s]", helpers.OnOff(stages[3].Enabled)),
+		fmt.Sprintf("Sharpen [%s]", helpers.OnOff(stages[4].Enabled)),
 	}
 
 	y := statusesY
@@ -171,12 +172,4 @@ func DrawNotification(img *gocv.Mat, text string) {
 	y := img.Rows() - topPadding
 
 	drawText(img, text, x, y, color.RGBA{255, 0, 0, 0})
-}
-
-// onOff converts a boolean value into an ON/OFF status string.
-func onOff(v bool) string {
-	if v {
-		return "ON "
-	}
-	return "OFF"
 }

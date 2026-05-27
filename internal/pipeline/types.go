@@ -27,3 +27,39 @@ type StageToggle struct {
 
 // StageFunc defines a processing stage function type.
 type StageFunc func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame
+
+// NewStages creates default pipeline stages.
+func NewStages() []StageToggle {
+	return []StageToggle{
+		{
+			Enabled: false,
+			Build: func(p *control.PipelineParams) StageFunc {
+				return BrightnessContrastStage(&p.BrightnessContrast)
+			},
+		},
+		{
+			Enabled: false,
+			Build: func(p *control.PipelineParams) StageFunc {
+				return BlurStage(&p.Blur)
+			},
+		},
+		{
+			Enabled: false,
+			Build: func(p *control.PipelineParams) StageFunc {
+				return EdgeStage(&p.Edge)
+			},
+		},
+		{
+			Enabled: false,
+			Build: func(p *control.PipelineParams) StageFunc {
+				return GrayStage()
+			},
+		},
+		{
+			Enabled: false,
+			Build: func(p *control.PipelineParams) StageFunc {
+				return SharpenStage()
+			},
+		},
+	}
+}

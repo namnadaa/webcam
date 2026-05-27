@@ -23,3 +23,20 @@ type PipelineParams struct {
 	Edge               EdgeParams
 	BrightnessContrast BrightnessContrastParams
 }
+
+// NewPipelineParams creates default pipeline parameters.
+func NewPipelineParams() *PipelineParams {
+	return &PipelineParams{
+		BrightnessContrast: BrightnessContrastParams{
+			Alpha: 1.0,
+			Beta:  0,
+		},
+		Blur: BlurParams{
+			Ksize: 5,
+		},
+		Edge: EdgeParams{
+			Threshold1: 50,
+			Threshold2: 150,
+		},
+	}
+}
