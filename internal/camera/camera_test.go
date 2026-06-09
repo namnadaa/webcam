@@ -7,6 +7,9 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// Hardware tests require a physical camera. Run with: go test ./internal/camera/...
+// In CI (no camera), skip with: go test -short ./...
+
 func openTestCamera(t *testing.T, cfg camera.Config) *camera.Camera {
 	t.Helper()
 	cam, err := camera.Open(cfg)
@@ -16,7 +19,33 @@ func openTestCamera(t *testing.T, cfg camera.Config) *camera.Camera {
 	return cam
 }
 
+func TestFourCCToString(t *testing.T) {
+	tests := []struct {
+		name   string
+		fourcc int
+		want   string
+	}{
+		{"MJPG", 0x47504A4D, "MJPG"},
+		{"YUY2", 0x32595559, "YUY2"},
+		{"zero returns empty", 0, ""},
+		{"non-printable returns empty", 0x01020304, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := camera.FourCCToString(tt.fourcc)
+			if got != tt.want {
+				t.Errorf("FourCCToString(%#x) = %q, want %q", tt.fourcc, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestOpen(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping hardware test")
+	}
+
 	tests := []struct {
 		name    string
 		cfg     camera.Config
@@ -26,7 +55,7 @@ func TestOpen(t *testing.T) {
 			"valid index",
 			camera.Config{
 				Index:  0,
-				API:    camera.APIAVFoundation,
+				API:    camera.APIAny,
 				Width:  640,
 				Height: 480,
 				FPS:    30,
@@ -37,7 +66,7 @@ func TestOpen(t *testing.T) {
 			"invalid index",
 			camera.Config{
 				Index: 99,
-				API:   camera.APIAVFoundation,
+				API:   camera.APIAny,
 			},
 			true,
 		},
@@ -77,6 +106,10 @@ func TestOpen(t *testing.T) {
 }
 
 func TestCamera_Read(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping hardware test")
+	}
+
 	tests := []struct {
 		name    string
 		cfg     camera.Config
@@ -87,7 +120,7 @@ func TestCamera_Read(t *testing.T) {
 			name: "valid camera read",
 			cfg: camera.Config{
 				Index:  0,
-				API:    camera.APIAVFoundation,
+				API:    camera.APIAny,
 				Width:  640,
 				Height: 480,
 				FPS:    30,
@@ -99,7 +132,7 @@ func TestCamera_Read(t *testing.T) {
 			name: "invalid camera index",
 			cfg: camera.Config{
 				Index: 99,
-				API:   camera.APIAVFoundation,
+				API:   camera.APIAny,
 			},
 			wantErr: true,
 			want:    false,
@@ -129,9 +162,13 @@ func TestCamera_Read(t *testing.T) {
 }
 
 func TestCamera_Properties(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping hardware test")
+	}
+
 	cam := openTestCamera(t, camera.Config{
 		Index:  0,
-		API:    camera.APIAVFoundation,
+		API:    camera.APIAny,
 		Width:  640,
 		Height: 480,
 		FPS:    30,

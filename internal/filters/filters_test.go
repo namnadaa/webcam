@@ -65,11 +65,7 @@ func TestFilters(t *testing.T) {
 		{
 			name: "Brightness and contrast adjustment (out of range alpha/beta)",
 			run: func(src gocv.Mat) (gocv.Mat, error) {
-				dst, err := filters.BrightnessContrast(src, 1000, 500)
-				if err != nil {
-					return dst, err
-				}
-				return dst, nil
+				return filters.BrightnessContrast(src, 1000, 500)
 			},
 		},
 		{
@@ -98,14 +94,18 @@ func TestFilters(t *testing.T) {
 			}
 
 			dst, err := tt.run(src)
+			defer dst.Close()
+
 			if tt.wantErr {
 				if err == nil {
-					t.Fatalf("%s: unexpected error: %v", tt.name, err)
+					t.Fatalf("%s: expected error but got nil", tt.name)
 				}
 				return
 			}
 
-			defer dst.Close()
+			if err != nil {
+				t.Fatalf("%s: unexpected error: %v", tt.name, err)
+			}
 
 			if dst.Empty() {
 				t.Errorf("%s: result is empty", tt.name)
