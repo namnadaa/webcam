@@ -13,20 +13,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Set up MSYS2 with OpenCV
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
+          path-type: inherit
           install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-opencv
             mingw-w64-x86_64-pkg-config
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
 
       - name: Test
         shell: msys2 {0}
