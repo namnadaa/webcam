@@ -118,13 +118,20 @@ func (c *Camera) PixelFormat() int {
 }
 
 // FourCCToString converts a FOURCC integer code into a human-readable string.
+// Returns empty string if bytes are non-printable.
 func FourCCToString(fourcc int) string {
-	return string([]byte{
+	b := []byte{
 		byte(fourcc),
 		byte(fourcc >> 8),
 		byte(fourcc >> 16),
 		byte(fourcc >> 24),
-	})
+	}
+	for _, c := range b {
+		if c < 32 || c > 126 {
+			return ""
+		}
+	}
+	return strings.TrimRight(string(b), " ")
 }
 
 // FindCameras searches for connected cameras and returns the Config list.
@@ -156,7 +163,7 @@ func FindCameras() []Config {
 		width, height := cam.ActualSize()
 		fps := cam.ActualFPS()
 		format := FourCCToString(cam.PixelFormat())
-		if format == "" || format == "\x00\x00\x00\x00" {
+		if format == "" {
 			format = "Unknown"
 		}
 
