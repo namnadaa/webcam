@@ -73,39 +73,59 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 
 		// ===== Brightness =====
 	case int('w'), int('W'):
+		params.Lock()
 		params.BrightnessContrast.Beta += 5
+		params.Unlock()
 	case int('s'), int('S'):
+		params.Lock()
 		params.BrightnessContrast.Beta -= 5
+		params.Unlock()
 
 		// ===== Contrast =====
 	case int('d'), int('D'):
+		params.Lock()
 		params.BrightnessContrast.Alpha += 0.1
+		params.Unlock()
 	case int('a'), int('A'):
+		params.Lock()
 		params.BrightnessContrast.Alpha -= 0.1
+		params.Unlock()
 
 		// ===== Blur size (Gaussian) =====
 	case int('e'), int('E'):
+		params.Lock()
 		params.Blur.Ksize += 2
 		if params.Blur.Ksize%2 == 0 {
 			params.Blur.Ksize++
 		}
+		params.Unlock()
 	case int('q'), int('Q'):
+		params.Lock()
 		if params.Blur.Ksize > 3 {
 			params.Blur.Ksize -= 2
 			if params.Blur.Ksize%2 == 0 {
 				params.Blur.Ksize--
 			}
 		}
+		params.Unlock()
 
 		// ===== Canny thresholds =====
 	case int('j'), int('J'):
+		params.Lock()
 		params.Edge.Threshold1 -= 5
+		params.Unlock()
 	case int('k'), int('K'):
+		params.Lock()
 		params.Edge.Threshold1 += 5
+		params.Unlock()
 	case int('n'), int('N'):
+		params.Lock()
 		params.Edge.Threshold2 -= 5
+		params.Unlock()
 	case int('m'), int('M'):
+		params.Lock()
 		params.Edge.Threshold2 += 5
+		params.Unlock()
 	}
 
 	return true, stageChanged, action
