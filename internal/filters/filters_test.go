@@ -94,14 +94,16 @@ func TestFilters(t *testing.T) {
 			}
 
 			dst, err := tt.run(src)
-			defer dst.Close()
 
 			if tt.wantErr {
+				dst.Close()
 				if err == nil {
 					t.Fatalf("%s: expected error but got nil", tt.name)
 				}
 				return
 			}
+
+			defer dst.Close()
 
 			if err != nil {
 				t.Fatalf("%s: unexpected error: %v", tt.name, err)
