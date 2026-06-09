@@ -24,17 +24,16 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	case 9: // TAB
 		uiState.ShowMenu = !uiState.ShowMenu
 
-	// macOS OpenCV arrow key codes
-	case 2: // LEFT
+	case keyArrowLeft: // LEFT
 		action = actions.ActionPrevResolution
 
-	case 3: // RIGHT
+	case keyArrowRight: // RIGHT
 		action = actions.ActionNextResolution
 
-	case 0: // UP
+	case keyArrowUp: // UP
 		action = actions.ActionNextFPS
 
-	case 1: // DOWN
+	case keyArrowDown: // DOWN
 		action = actions.ActionPrevFPS
 
 	case int('t'), int('T'): // statistics

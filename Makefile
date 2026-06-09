@@ -16,25 +16,25 @@ export CPATH
 export PKG_CONFIG_PATH
 export CGO_ENABLED=1
 
-.PHONY: test test-pkg test-func run build build-mac build-win clean release 
+.PHONY: test test-pkg test-func run build build-mac clean release
 
 # ==== TESTS ====
 # Run all tests in all packages (timeout 30s)
 test:
 	@echo "Using SDKROOT=$(SDKROOT)"
-	CGO_ENABLED=1 go test -v -timeout 30s ./...
+	go test -v -timeout 30s ./...
 
 # Run all tests in one package with coverage (timeout 30s)
 # Example: make test-pkg PKG=./internal/camera
 test-pkg:
 	@echo "Using SDKROOT=$(SDKROOT)"
-	CGO_ENABLED=1 go test -v -timeout 30s -cover $(PKG)
+	go test -v -timeout 30s -cover $(PKG)
 
 # Run one test function in one package (timeout 30s)
 # Example: make test-func PKG=./internal/camera FUNC=TestOpen
 test-func:
 	@echo "Using SDKROOT=$(SDKROOT)"
-	CGO_ENABLED=1 go test -v -timeout 30s -run ^$(FUNC)$$ $(PKG)
+	go test -v -timeout 30s -run ^$(FUNC)$$ $(PKG)
 
 # ==== RUN ====
 # Run the main application
