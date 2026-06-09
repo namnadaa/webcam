@@ -40,6 +40,13 @@ jobs:
           export CGO_CFLAGS="-I${MINGW}/include/opencv4"
           export CGO_CXXFLAGS="-I${MINGW}/include/opencv4"
           export CGO_LDFLAGS="-L${MINGW}/lib"
+          # gocv on Windows expects versioned names (libopencv_core4120.dll.a)
+          # MSYS2 uses unversioned names (libopencv_core.dll.a)
+          # Create versioned symlinks to match what gocv's hardcoded LDFLAGS expect
+          for f in /mingw64/lib/libopencv_*.dll.a; do
+            name="${f%.dll.a}"
+            ln -sf "$f" "${name}4120.dll.a"
+          done
           mkdir -p build
           go build -o build/webcam.exe ./cmd/cam
 
