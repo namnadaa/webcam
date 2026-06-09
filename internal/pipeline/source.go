@@ -97,7 +97,7 @@ func GrayStage() StageFunc {
 						return
 					case next <- Frame{
 						Img:  dst,
-						Time: time.Now(),
+						Time: f.Time,
 					}:
 					}
 				case <-done:
@@ -110,7 +110,7 @@ func GrayStage() StageFunc {
 }
 
 // BlurStage applies Gaussian blur.
-func BlurStage(p *control.BlurParams) StageFunc {
+func BlurStage(p *control.PipelineParams) StageFunc {
 	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
 
@@ -125,7 +125,11 @@ func BlurStage(p *control.BlurParams) StageFunc {
 					if !ok {
 						return
 					}
-					dst, err := filters.Blur(f.Img, p.Ksize)
+					p.RLock()
+					ksize := p.Blur.Ksize
+					p.RUnlock()
+
+					dst, err := filters.Blur(f.Img, ksize)
 					f.Close()
 					if err != nil {
 						mapErr("blur", err)
@@ -138,7 +142,7 @@ func BlurStage(p *control.BlurParams) StageFunc {
 						return
 					case next <- Frame{
 						Img:  dst,
-						Time: time.Now(),
+						Time: f.Time,
 					}:
 					}
 				case <-done:
@@ -151,7 +155,7 @@ func BlurStage(p *control.BlurParams) StageFunc {
 }
 
 // EdgeStage detects edges using the Canny algorithm.
-func EdgeStage(p *control.EdgeParams) StageFunc {
+func EdgeStage(p *control.PipelineParams) StageFunc {
 	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
 
@@ -166,7 +170,11 @@ func EdgeStage(p *control.EdgeParams) StageFunc {
 					if !ok {
 						return
 					}
-					dst, err := filters.Edge(f.Img, p.Threshold1, p.Threshold2)
+					p.RLock()
+					t1, t2 := p.Edge.Threshold1, p.Edge.Threshold2
+					p.RUnlock()
+
+					dst, err := filters.Edge(f.Img, t1, t2)
 					f.Close()
 					if err != nil {
 						mapErr("edge", err)
@@ -179,7 +187,7 @@ func EdgeStage(p *control.EdgeParams) StageFunc {
 						return
 					case next <- Frame{
 						Img:  dst,
-						Time: time.Now(),
+						Time: f.Time,
 					}:
 					}
 				case <-done:
@@ -192,7 +200,7 @@ func EdgeStage(p *control.EdgeParams) StageFunc {
 }
 
 // BrightnessContrastStage adjusts brightness and contrast.
-func BrightnessContrastStage(p *control.BrightnessContrastParams) StageFunc {
+func BrightnessContrastStage(p *control.PipelineParams) StageFunc {
 	return func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup) <-chan Frame {
 		next := make(chan Frame)
 
@@ -207,7 +215,11 @@ func BrightnessContrastStage(p *control.BrightnessContrastParams) StageFunc {
 					if !ok {
 						return
 					}
-					dst, err := filters.BrightnessContrast(f.Img, p.Alpha, p.Beta)
+					p.RLock()
+					alpha, beta := p.BrightnessContrast.Alpha, p.BrightnessContrast.Beta
+					p.RUnlock()
+
+					dst, err := filters.BrightnessContrast(f.Img, alpha, beta)
 					f.Close()
 					if err != nil {
 						mapErr("brightness_contrast", err)
@@ -220,7 +232,7 @@ func BrightnessContrastStage(p *control.BrightnessContrastParams) StageFunc {
 						return
 					case next <- Frame{
 						Img:  dst,
-						Time: time.Now(),
+						Time: f.Time,
 					}:
 					}
 				case <-done:
@@ -261,7 +273,7 @@ func SharpenStage() StageFunc {
 						return
 					case next <- Frame{
 						Img:  dst,
-						Time: time.Now(),
+						Time: f.Time,
 					}:
 					}
 				case <-done:
@@ -300,7 +312,7 @@ func ToBGRStage() StageFunc {
 							return
 						case next <- Frame{
 							Img:  dst,
-							Time: time.Now(),
+							Time: f.Time,
 						}:
 						}
 						continue
