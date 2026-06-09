@@ -16,11 +16,16 @@ export CPATH
 export PKG_CONFIG_PATH
 export CGO_ENABLED=1
 
-.PHONY: test test-pkg test-func run build build-mac clean release
+.PHONY: test test-hardware test-pkg test-func run build build-mac clean release
 
 # ==== TESTS ====
-# Run all tests in all packages (timeout 30s)
+# Run all tests, skip hardware (camera) tests
 test:
+	@echo "Using SDKROOT=$(SDKROOT)"
+	go test -short -v -timeout 30s ./...
+
+# Run all tests including hardware (requires a connected camera)
+test-hardware:
 	@echo "Using SDKROOT=$(SDKROOT)"
 	go test -v -timeout 30s ./...
 
