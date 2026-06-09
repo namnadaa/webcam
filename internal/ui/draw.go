@@ -132,17 +132,10 @@ func DrawSettings(img *gocv.Mat, params *control.PipelineParams) {
 
 // DrawStatuses renders filter enable statuses.
 func DrawStatuses(img *gocv.Mat, stages []pipeline.StageToggle) {
-	statuses := []string{
-		fmt.Sprintf("Brightness/Contrast [%s]", helpers.OnOff(stages[0].Enabled)),
-		fmt.Sprintf("Blur [%s]", helpers.OnOff(stages[1].Enabled)),
-		fmt.Sprintf("Edge [%s]", helpers.OnOff(stages[2].Enabled)),
-		fmt.Sprintf("Gray [%s]", helpers.OnOff(stages[3].Enabled)),
-		fmt.Sprintf("Sharpen [%s]", helpers.OnOff(stages[4].Enabled)),
-	}
-
 	y := statusesY
 
-	for _, line := range statuses {
+	for _, st := range stages {
+		line := fmt.Sprintf("%s [%s]", st.Name, helpers.OnOff(st.Enabled))
 		drawRightText(img, line, y, color.RGBA{0, 255, 0, 0})
 		y += lineHeight
 	}

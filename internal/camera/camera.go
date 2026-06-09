@@ -189,12 +189,17 @@ func FindCameras() []Config {
 func AskCameraSettings() (int, int, float64, bool) {
 	var choice string
 
-	fmt.Print("\nChange camera settings? (y/n): ")
-	fmt.Scan(&choice)
+	for {
+		fmt.Print("\nChange camera settings? (y/n): ")
+		fmt.Scan(&choice)
+		choice = strings.ToLower(strings.TrimSpace(choice))
+		if choice == "y" || choice == "n" {
+			break
+		}
+		fmt.Println("Please enter 'y' or 'n'")
+	}
 
-	choice = strings.ToLower(strings.TrimSpace(choice))
-
-	if choice != "y" && choice != "Y" {
+	if choice != "y" {
 		return 0, 0, 0, false
 	}
 

@@ -21,6 +21,7 @@ func (f *Frame) Close() {
 
 // StageToggle — pipeline element that can be turned on/off
 type StageToggle struct {
+	Name    string
 	Enabled bool
 	Build   func(params *control.PipelineParams) StageFunc
 }
@@ -32,30 +33,35 @@ type StageFunc func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup)
 func NewStages() []StageToggle {
 	return []StageToggle{
 		{
+			Name:    "Brightness/Contrast",
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return BrightnessContrastStage(p)
 			},
 		},
 		{
+			Name:    "Blur",
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return BlurStage(p)
 			},
 		},
 		{
+			Name:    "Edge",
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return EdgeStage(p)
 			},
 		},
 		{
+			Name:    "Gray",
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return GrayStage()
 			},
 		},
 		{
+			Name:    "Sharpen",
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return SharpenStage()
