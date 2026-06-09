@@ -1,5 +1,7 @@
 package control
 
+import "sync"
+
 // BlurParams — Gaussian Blur parameters.
 type BlurParams struct {
 	Ksize int // the size of the blur core (must be odd: 3, 5, 7...)
@@ -19,10 +21,16 @@ type BrightnessContrastParams struct {
 
 // PipelineParams is a common set of parameters for all pipeline stages.
 type PipelineParams struct {
+	mu                 sync.RWMutex
 	Blur               BlurParams
 	Edge               EdgeParams
 	BrightnessContrast BrightnessContrastParams
 }
+
+func (p *PipelineParams) RLock()   { p.mu.RLock() }
+func (p *PipelineParams) RUnlock() { p.mu.RUnlock() }
+func (p *PipelineParams) Lock()    { p.mu.Lock() }
+func (p *PipelineParams) Unlock()  { p.mu.Unlock() }
 
 // NewPipelineParams creates default pipeline parameters.
 func NewPipelineParams() *PipelineParams {

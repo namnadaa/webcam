@@ -34,19 +34,19 @@ func NewStages() []StageToggle {
 		{
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
-				return BrightnessContrastStage(&p.BrightnessContrast)
+				return BrightnessContrastStage(p)
 			},
 		},
 		{
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
-				return BlurStage(&p.Blur)
+				return BlurStage(p)
 			},
 		},
 		{
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
-				return EdgeStage(&p.Edge)
+				return EdgeStage(p)
 			},
 		},
 		{
