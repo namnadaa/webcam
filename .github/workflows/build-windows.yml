@@ -41,9 +41,7 @@ jobs:
           export CGO_CXXFLAGS="-I${MINGW}/include/opencv4"
           export CGO_LDFLAGS="-L${MINGW}/lib"
           mkdir -p /c/opencv/build/install/include
-          ln -sfn /mingw64/include/opencv4/opencv2 /c/opencv/build/install/include/opencv2
-          # gocv on Windows expects versioned names (libopencv_core4120.dll.a)
-          # MSYS2 uses unversioned names (libopencv_core.dll.a)
+          cp -r /mingw64/include/opencv4/opencv2 /c/opencv/build/install/include/opencv2
           for f in /mingw64/lib/libopencv_*.dll.a; do
             name="${f%.dll.a}"
             ln -sf "$f" "${name}4120.dll.a"
