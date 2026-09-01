@@ -53,19 +53,22 @@ jobs:
       - name: Copy required DLLs
         shell: msys2 {0}
         run: |
-          # Copy direct dependencies
-          ldd build/webcam.exe 2>/dev/null \
-            | awk '/\/mingw64\//{print $3}' \
-            | xargs -r cp -n -t build/ || true
-          # Copy transitive dependencies (3 passes handles Qt and other deep chains)
-          for pass in 1 2 3; do
-            for dll in build/*.dll; do
-              [ -f "$dll" ] || continue
-              ldd "$dll" 2>/dev/null \
-                | awk '/\/mingw64\//{print $3}' \
-                | xargs -r cp -n -t build/ || true
+          mkdir -p build/platforms
+          copied=1
+          while [ "$copied" -eq 1 ]; do
+            copied=0
+            for f in build/webcam.exe build/*.dll; do
+              [ -f "$f" ] || continue
+              for dep in $(ldd "$f" 2>/dev/null | awk '/\/mingw64\//{print $3}'); do
+                base=$(basename "$dep")
+                if [ ! -f "build/$base" ]; then
+                  cp -n "$dep" build/
+                  copied=1
+                fi
+              done
             done
           done
+          cp /mingw64/share/qt6/plugins/platforms/qwindows.dll build/platforms/ 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
