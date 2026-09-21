@@ -28,6 +28,8 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-opencv
             mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-qt6-base
+            mingw-w64-x86_64-qt6-5compat
 
       - name: Build
         shell: msys2 {0}
