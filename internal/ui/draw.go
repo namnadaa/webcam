@@ -73,6 +73,7 @@ func DrawMenu(img *gocv.Mat) {
 		"[P] Toggle Parameters",
 		"[F] Toggle Filters",
 		"[C] Toggle Controls",
+		"[B] Noise / Dead Pixel Test",
 		"",
 		"[X] Screenshot",
 		"[R] Video Recording",

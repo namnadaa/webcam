@@ -10,6 +10,7 @@ import (
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
+	"webcam/internal/diagnostics"
 	"webcam/internal/helpers"
 	"webcam/internal/logger"
 	"webcam/internal/media"
@@ -99,6 +100,7 @@ func main() {
 			)
 
 			recorder := &media.VideoRecorder{}
+			noiseCollector := diagnostics.NewCollector(60, 1.0, 3.0) // 60 кадров, порог "мёртвого" = 1.0, "шумный" = среднее*3
 
 			runCamera := true
 			for runCamera {
@@ -142,6 +144,15 @@ func main() {
 
 						if media.HandleScreenshot(&mediaState, f.Img) {
 							uiState.ShowNotification("Screenshot saved", 2*time.Second)
+						}
+
+						noiseResult := diagnostics.UpdateNoiseTest(noiseCollector, &mediaState, f.Img)
+
+						switch noiseResult.Event {
+						case diagnostics.EventStarted, diagnostics.EventDone:
+							uiState.ShowNotification(noiseResult.Message, 4*time.Second)
+						case diagnostics.EventProgress:
+							uiState.ShowNotification(noiseResult.Message, 300*time.Millisecond)
 						}
 
 						ui.RenderOverlay(

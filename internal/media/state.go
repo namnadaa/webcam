@@ -4,6 +4,7 @@ package media
 type State struct {
 	Screenshot bool
 	Recording  bool
+	NoiseTest  bool
 }
 
 // NewMediaState creates default media state.
@@ -11,5 +12,6 @@ func NewMediaState() State {
 	return State{
 		Screenshot: false,
 		Recording:  false,
+		NoiseTest:  false,
 	}
 }

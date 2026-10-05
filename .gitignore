@@ -3,6 +3,7 @@
 /bin/
 /screenshots/
 /videos/
+/noise_reports/
 /logs/
 /build/
 *.exe
