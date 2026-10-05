@@ -176,6 +176,25 @@ func SaveReport(r Report) error {
 		return fmt.Errorf("failed to save noise report")
 	}
 
+	deadPct := float64(r.DeadCount) / float64(r.TotalPixels) * 100
+	noisyPct := float64(r.NoisyCount) / float64(r.TotalPixels) * 100
+
+	report := fmt.Sprintf(
+		"Noise test report - %s\n"+
+			"Resolution: %dx%d (%d pixels total)\n"+
+			"Dead/stuck pixels:  %d (%.4f%%)\n"+
+			"Noisy pixels:       %d (%.4f%%)\n",
+		time.Now().Format("2006-01-02 15:04:05"),
+		r.Mean.Cols(), r.Mean.Rows(), r.TotalPixels,
+		r.DeadCount, deadPct,
+		r.NoisyCount, noisyPct,
+	)
+
+	txtPath := filepath.Join("noise_reports", fmt.Sprintf("noise_report_%s.txt", time.Now().Format("2006-01-02_15-04-05")))
+	if err := os.WriteFile(txtPath, []byte(report), 0644); err != nil {
+		slog.Error("noise report txt save error", "err", err)
+	}
+
 	slog.Info("noise test complete",
 		"dead_pixels", r.DeadCount,
 		"noisy_pixels", r.NoisyCount,
