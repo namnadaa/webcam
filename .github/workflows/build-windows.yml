@@ -31,6 +31,28 @@ jobs:
             mingw-w64-x86_64-qt6-base
             mingw-w64-x86_64-qt6-5compat
 
+      - name: Retry install if OpenCV headers missing
+        shell: msys2 {0}
+        run: |
+          if [ ! -d /mingw64/include/opencv4/opencv2 ]; then
+            echo "OpenCV headers missing, retrying installation..."
+            pacman -S --noconfirm --needed mingw-w64-x86_64-opencv mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-5compat
+          fi
+
+      - name: Sanity check OpenCV install
+        shell: msys2 {0}
+        run: |
+          set +e
+          echo "=== pacman -Q opencv/qt6 ==="
+          pacman -Q mingw-w64-x86_64-opencv || echo "OPENCV NOT INSTALLED"
+          pacman -Q mingw-w64-x86_64-qt6-base || echo "QT6-BASE NOT INSTALLED"
+          pacman -Q mingw-w64-x86_64-qt6-5compat || echo "QT6-5COMPAT NOT INSTALLED"
+          echo "=== ls /mingw64/include ==="
+          ls /mingw64/include/ 2>&1 | head -30
+          echo "=== find opencv.hpp ==="
+          find /mingw64/include -iname "opencv.hpp" 2>&1
+          set -e
+
       - name: Build
         shell: msys2 {0}
         env:
