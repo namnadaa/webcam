@@ -21,36 +21,22 @@ jobs:
       - name: Set up MSYS2 with OpenCV
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: false
           path-type: inherit
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-opencv
-            mingw-w64-x86_64-pkg-config
-            mingw-w64-x86_64-qt6-base
-            mingw-w64-x86_64-qt6-5compat
-
-      - name: Retry install if OpenCV headers missing
-        shell: msys2 {0}
-        run: |
-          if [ ! -d /mingw64/include/opencv4/opencv2 ]; then
-            echo "OpenCV headers missing, retrying installation..."
-            pacman -S --noconfirm --needed mingw-w64-x86_64-opencv mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-5compat
-          fi
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-opencv
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-5compat
 
       - name: Sanity check OpenCV install
         shell: msys2 {0}
         run: |
           set +e
-          echo "=== pacman -Q opencv/qt6 ==="
-          pacman -Q mingw-w64-x86_64-opencv || echo "OPENCV NOT INSTALLED"
-          pacman -Q mingw-w64-x86_64-qt6-base || echo "QT6-BASE NOT INSTALLED"
-          pacman -Q mingw-w64-x86_64-qt6-5compat || echo "QT6-5COMPAT NOT INSTALLED"
-          echo "=== ls /mingw64/include ==="
-          ls /mingw64/include/ 2>&1 | head -30
-          echo "=== find opencv.hpp ==="
-          find /mingw64/include -iname "opencv.hpp" 2>&1
+          pacman -Q mingw-w64-ucrt-x86_64-opencv
+          find /ucrt64/include -iname "opencv.hpp" 2>&1
           set -e
 
       - name: Build
@@ -59,16 +45,18 @@ jobs:
           CGO_ENABLED: "1"
           CC: gcc
         run: |
-          MINGW=$(cygpath -m /mingw64)
-          export PKG_CONFIG_PATH="${MINGW}/lib/pkgconfig"
-          export CGO_CFLAGS="-I${MINGW}/include/opencv4"
-          export CGO_CXXFLAGS="-I${MINGW}/include/opencv4"
-          export CGO_LDFLAGS="-L${MINGW}/lib"
+          UCRT=$(cygpath -m /ucrt64)
+          export PKG_CONFIG_PATH="${UCRT}/lib/pkgconfig"
+          export CGO_CFLAGS="-I${UCRT}/include/opencv4"
+          export CGO_CXXFLAGS="-I${UCRT}/include/opencv4"
+          export CGO_LDFLAGS="-L${UCRT}/lib"
+
           mkdir -p /c/opencv/build/install/include
-          cp -r /mingw64/include/opencv4/opencv2 /c/opencv/build/install/include/opencv2
-          for f in /mingw64/lib/libopencv_*.dll.a; do
+          cp -r /ucrt64/include/opencv4/opencv2 /c/opencv/build/install/include/opencv2
+
+          for f in /ucrt64/lib/libopencv_*.dll.a; do
             name="${f%.dll.a}"
-            ln -sf "$f" "${name}4120.dll.a"
+            ln -sf "$f" "${name}4130.dll.a"
           done
 
           mkdir -p build
@@ -83,7 +71,7 @@ jobs:
             copied=0
             for f in build/webcam.exe build/*.dll; do
               [ -f "$f" ] || continue
-              for dep in $(ldd "$f" 2>/dev/null | awk '/\/mingw64\//{print $3}'); do
+              for dep in $(ldd "$f" 2>/dev/null | awk '/\/ucrt64\//{print $3}'); do
                 base=$(basename "$dep")
                 if [ ! -f "build/$base" ]; then
                   cp -n "$dep" build/
@@ -92,7 +80,7 @@ jobs:
               done
             done
           done
-          cp /mingw64/share/qt6/plugins/platforms/qwindows.dll build/platforms/ 2>/dev/null || true
+          cp /ucrt64/share/qt6/plugins/platforms/qwindows.dll build/platforms/ 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
