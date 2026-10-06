@@ -39,6 +39,12 @@ jobs:
           find /ucrt64/include -iname "opencv.hpp" 2>&1
           set -e
 
+      - name: Pin OpenCV to 4.13 (avoid breaking OpenCV 5 upgrade)
+        shell: msys2 {0}
+        run: |
+          pacman -U --noconfirm \
+            https://mirror.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-opencv-4.13.0-2-any.pkg.tar.zst
+            
       - name: Build
         shell: msys2 {0}
         env:
