@@ -61,8 +61,8 @@ jobs:
           cp -r /ucrt64/include/opencv4/opencv2 /c/opencv/build/install/include/opencv2
 
           for f in /ucrt64/lib/libopencv_*.dll.a; do
-            name="${f%.dll.a}"
-            ln -sf "$f" "${name}4130.dll.a"
+             name="${f%.dll.a}"
+            ln -sf "$f" "${name}4120.dll.a"
           done
 
           mkdir -p build
