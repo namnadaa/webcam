@@ -1,8 +1,6 @@
 package keyboard
 
 import (
-	"fmt"
-	"runtime"
 	"webcam/internal/actions"
 	"webcam/internal/control"
 	"webcam/internal/media"
@@ -15,17 +13,7 @@ import (
 // HandleKeyboard — changes parameters by pressing buttons.
 // Returns false if the program needs to be terminated.
 func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []pipeline.StageToggle, uiState *ui.State, mediaState *media.State) (bool, bool, actions.CameraAction) {
-	var key int
-	if runtime.GOOS == "windows" {
-		key = win.WaitKeyEx(1) // full code, arrows are not masked to 0
-	} else {
-		key = win.WaitKey(1)
-	}
-
-	if key != -1 {
-		fmt.Println("key code:", key)
-	}
-
+	key := readKey(win)
 	stageChanged := false
 	action := actions.ActionNone
 
