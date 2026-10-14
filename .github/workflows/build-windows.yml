@@ -18,75 +18,101 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up MSYS2 with OpenCV
+      - name: Cache OpenCV build
+        id: opencv-cache
+        uses: actions/cache@v4
+        with:
+          path: C:\opencv\build\install
+          key: opencv-4.12.0-mingw-noqt-v1
+
+      - name: Checkout OpenCV 4.12.0
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: opencv/opencv
+          ref: 4.12.0
+          path: opencv-src
+          fetch-depth: 1
+
+      - name: Checkout OpenCV contrib 4.12.0
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: opencv/opencv_contrib
+          ref: 4.12.0
+          path: opencv-contrib-src
+          fetch-depth: 1
+
+      - name: Set up MSYS2 toolchain
         uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: MINGW64
           update: false
           path-type: inherit
           install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-opencv
-            mingw-w64-ucrt-x86_64-pkg-config
-            mingw-w64-ucrt-x86_64-qt6-base
-            mingw-w64-ucrt-x86_64-qt6-5compat
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
 
-      - name: Sanity check OpenCV install
+      - name: Build OpenCV 4.12.0 (no Qt, no FFmpeg)
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: |
-          set +e
-          pacman -Q mingw-w64-ucrt-x86_64-opencv
-          find /ucrt64/include -iname "opencv.hpp" 2>&1
-          set -e
+          cmake -S opencv-src -B opencv-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=C:/opencv/build/install \
+            -DOPENCV_EXTRA_MODULES_PATH="$PWD/opencv-contrib-src/modules" \
+            -DBUILD_LIST=core,imgproc,imgcodecs,videoio,highgui,objdetect,features2d,video,dnn,calib3d,photo,face,xfeatures2d,plot,tracking,img_hash,bgsegm,aruco,wechat_qrcode,ximgproc \
+            -DBUILD_SHARED_LIBS=ON \
+            -DOPENCV_ENABLE_NONFREE=ON \
+            -DWITH_QT=OFF \
+            -DWITH_FFMPEG=OFF \
+            -DWITH_OPENCL=OFF \
+            -DWITH_IPP=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_PERF_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_DOCS=OFF \
+            -DBUILD_opencv_apps=OFF
+          cmake --build opencv-build
+          cmake --install opencv-build
 
-      - name: Pin OpenCV to 4.13 (avoid breaking OpenCV 5 upgrade)
-        shell: msys2 {0}
-        run: |
-          pacman -U --noconfirm \
-            https://mirror.msys2.org/mingw/ucrt64/mingw-w64-ucrt-x86_64-opencv-4.13.0-2-any.pkg.tar.zst
-            
       - name: Build
         shell: msys2 {0}
         env:
           CGO_ENABLED: "1"
           CC: gcc
+          CXX: g++
         run: |
-          UCRT=$(cygpath -m /ucrt64)
-          export PKG_CONFIG_PATH="${UCRT}/lib/pkgconfig"
-          export CGO_CFLAGS="-I${UCRT}/include/opencv4"
-          export CGO_CXXFLAGS="-I${UCRT}/include/opencv4"
-          export CGO_LDFLAGS="-L${UCRT}/lib"
-
-          mkdir -p /c/opencv/build/install/include
-          cp -r /ucrt64/include/opencv4/opencv2 /c/opencv/build/install/include/opencv2
-
-          for f in /ucrt64/lib/libopencv_*.dll.a; do
-             name="${f%.dll.a}"
-            ln -sf "$f" "${name}4120.dll.a"
-          done
-
           mkdir -p build
           go build -o build/webcam.exe ./cmd/cam
 
       - name: Copy required DLLs
         shell: msys2 {0}
         run: |
-          mkdir -p build/platforms
+          export PATH="/c/opencv/build/install/x64/mingw/bin:$PATH"
+          cp /c/opencv/build/install/x64/mingw/bin/libopencv_*.dll build/
+
           copied=1
           while [ "$copied" -eq 1 ]; do
             copied=0
             for f in build/webcam.exe build/*.dll; do
-              [ -f "$f" ] || continue
-              for dep in $(ldd "$f" 2>/dev/null | awk '/\/ucrt64\//{print $3}'); do
+              for dep in $(ldd "$f" 2>/dev/null | awk '/\/mingw64\//{print $3}'); do
                 base=$(basename "$dep")
                 if [ ! -f "build/$base" ]; then
-                  cp -n "$dep" build/
+                  cp "$dep" build/
                   copied=1
                 fi
               done
             done
           done
-          cp /ucrt64/share/qt6/plugins/platforms/qwindows.dll build/platforms/ 2>/dev/null || true
+
+          echo "=== unresolved dependencies (must be empty) ==="
+          missing=$(for f in build/webcam.exe build/*.dll; do ldd "$f" 2>/dev/null | grep -i "not found"; done)
+          echo "$missing"
+          [ -z "$missing" ] || exit 1
+
+          ls -la build/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
