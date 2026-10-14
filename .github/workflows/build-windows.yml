@@ -123,9 +123,14 @@ jobs:
           done
 
           echo "=== unresolved dependencies (must be empty) ==="
-          missing=$(for f in build/webcam.exe build/*.dll; do ldd "$f" 2>/dev/null | grep -i "not found"; done)
-          echo "$missing"
-          [ -z "$missing" ] || exit 1
+          # grep exits with 1 when it finds nothing; under bash -e -o pipefail that
+          # would kill the step even though nothing is missing, so tolerate it.
+          missing=$(for f in build/webcam.exe build/*.dll; do ldd "$f" 2>/dev/null | grep -i "not found" || true; done)
+          if [ -n "$missing" ]; then
+            echo "$missing"
+            exit 1
+          fi
+          echo "none - all dependencies resolved"
 
           ls -la build/
 
