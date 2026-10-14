@@ -1,6 +1,7 @@
 package keyboard
 
 import (
+	"fmt"
 	"runtime"
 	"webcam/internal/actions"
 	"webcam/internal/control"
@@ -20,6 +21,11 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	} else {
 		key = win.WaitKey(1)
 	}
+
+	if key != -1 {
+		fmt.Println("key code:", key)
+	}
+
 	stageChanged := false
 	action := actions.ActionNone
 
