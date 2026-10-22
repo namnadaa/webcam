@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gocv.io/x/gocv"
@@ -167,4 +168,63 @@ func PrintModes(modes []Mode) {
 		fmt.Printf("[%d] %-12s FPS: %s\n", i+1, m.String(), FormatFPS(m.FPS))
 	}
 	fmt.Println("===============================================================")
+}
+
+// AskMatrix asks which resolutions, each with all its frame rates, the mode matrix should compare.
+// Returns nil when the user skips the matrix.
+func AskMatrix(modes []Mode) []Mode {
+	var input string
+
+	for {
+		fmt.Print("\nMode matrix: resolutions to compare (e.g. 1,3,5 or 'all', 'n' to skip): ")
+		fmt.Scan(&input)
+
+		input = strings.ToLower(strings.TrimSpace(input))
+		if input == "n" {
+			return nil
+		}
+
+		idx, err := ParseSelection(input, len(modes))
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		selected := make([]Mode, 0, len(idx))
+		runs := 0
+		for _, i := range idx {
+			selected = append(selected, modes[i])
+			runs += max(1, len(modes[i].FPS))
+		}
+		fmt.Printf("Mode matrix: %d camera modes, start it in the camera window with [U]\n", runs)
+		return selected
+	}
+}
+
+// ParseSelection parses "all" or a comma-separated list of 1-based numbers up to n
+// into unique 0-based indices in the given order.
+func ParseSelection(input string, n int) ([]int, error) {
+	if input == "all" {
+		idx := make([]int, n)
+		for i := range idx {
+			idx[i] = i
+		}
+		return idx, nil
+	}
+
+	var idx []int
+	seen := map[int]bool{}
+
+	for _, part := range strings.Split(input, ",") {
+		num, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || num < 1 || num > n {
+			return nil, fmt.Errorf("enter numbers from 1 to %d separated by commas, 'all' or 'n'", n)
+		}
+		if !seen[num] {
+			seen[num] = true
+			idx = append(idx, num-1)
+		}
+	}
+
+	return idx, nil
 }

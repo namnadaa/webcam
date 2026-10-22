@@ -101,28 +101,38 @@ func (c *Controller) Toggle(meta Meta) string {
 
 // Stop ends the running experiment early and saves the results.
 func (c *Controller) Stop() string {
-	return c.finish(true)
+	msg, _ := c.finish(true)
+	return msg
+}
+
+// LightState returns the light state of the last frame in the modulator mode, or "".
+func (c *Controller) LightState() string {
+	if c.session == nil || c.session.Config().Mode != ModeModulator {
+		return ""
+	}
+	return c.session.State().String()
 }
 
 // Update measures a raw camera frame and feeds it to the running experiment.
-// Returns a message when the experiment has just finished on its own.
-func (c *Controller) Update(raw gocv.Mat, t time.Time) string {
+// When the experiment has just finished on its own, returns a message and its summary.
+func (c *Controller) Update(raw gocv.Mat, t time.Time) (string, *Summary) {
 	c.last = c.meter.Measure(raw, t)
 
 	if c.session != nil && c.session.Add(c.last, c.meter.Gray()) {
 		return c.finish(false)
 	}
-	return ""
+	return "", nil
 }
 
-// finish saves the session results and returns a message for the user.
-func (c *Controller) finish(stopped bool) string {
+// finish saves the session results and returns a message for the user and the summary.
+// The summary is returned even on a save error, so a mode matrix can still record the step.
+func (c *Controller) finish(stopped bool) (string, *Summary) {
 	summary, err := c.session.Finish(stopped)
 	c.session = nil
 
 	if err != nil {
 		slog.Error("experiment finish", "err", err)
-		return "Experiment save error: " + err.Error()
+		return "Experiment save error: " + err.Error(), &summary
 	}
-	return "Experiment done: " + summary.String()
+	return "Experiment done: " + summary.String(), &summary
 }

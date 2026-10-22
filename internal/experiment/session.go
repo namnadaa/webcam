@@ -32,6 +32,36 @@ type Meta struct {
 	Controls   string
 }
 
+// part accumulates the frames of one group: all frames, or ON / OFF frames in the modulator mode.
+type part struct {
+	name      string // "" for all frames, "on" / "off" for the modulator
+	collector *diagnostics.Collector
+	level     Running
+	noise     Running
+	above     int
+
+	// filled by Finish
+	report diagnostics.Report
+	field  Field
+	done   bool
+}
+
+// suffix returns "_on" / "_off" for file names, or "" for all frames.
+func (p *part) suffix() string {
+	if p.name == "" {
+		return ""
+	}
+	return "_" + p.name
+}
+
+// abovePct returns the share of frames whose temporal noise exceeded the threshold.
+func (p *part) abovePct() float64 {
+	if p.noise.N == 0 {
+		return 0
+	}
+	return float64(p.above) / float64(p.noise.N) * 100
+}
+
 // Session is one running experiment: it streams per-frame data to CSV and
 // accumulates per-pixel statistics for the final report.
 type Session struct {
@@ -40,7 +70,9 @@ type Session struct {
 	dir     string
 	started time.Time
 
-	collector *diagnostics.Collector
+	parts      []*part
+	classifier *Classifier // modulator only
+	lastState  LightState
 
 	file      *os.File
 	csv       *bufio.Writer
@@ -81,20 +113,27 @@ func Start(cfg Config, meta Meta, rows, cols int) (*Session, error) {
 	}
 
 	w := bufio.NewWriter(file)
-	fmt.Fprintln(w, "frame,t_sec,mean,drift,spatial_std,temporal_noise,above_threshold")
-
-	collector := diagnostics.NewCollector(0, deadThreshold, 3.0)
-	collector.Start(rows, cols)
+	fmt.Fprintln(w, "frame,t_sec,mean,drift,spatial_std,temporal_noise,above_threshold,state")
 
 	s := &Session{
 		cfg:       cfg,
 		meta:      meta,
 		dir:       dir,
 		started:   now,
-		collector: collector,
 		file:      file,
 		csv:       w,
 		lastFlush: now,
+	}
+
+	names := []string{""}
+	if cfg.Mode == ModeModulator {
+		names = []string{"on", "off"}
+		s.classifier = &Classifier{}
+	}
+	for _, n := range names {
+		c := diagnostics.NewCollector(0, deadThreshold, 3.0)
+		c.Start(rows, cols)
+		s.parts = append(s.parts, &part{name: n, collector: c})
 	}
 
 	slog.Info("experiment started", "dir", dir, "config", cfg.String())
@@ -112,6 +151,11 @@ func (s *Session) Config() Config {
 // Elapsed returns the time since the start.
 func (s *Session) Elapsed() time.Duration {
 	return time.Since(s.started)
+}
+
+// State returns the light state of the last frame (modulator mode only).
+func (s *Session) State() LightState {
+	return s.lastState
 }
 
 // Add records one frame. gray is the grayscale raw frame the sample was measured on.
@@ -139,19 +183,67 @@ func (s *Session) Add(sample Sample, gray gocv.Mat) bool {
 	}
 	s.prevTime = sample.Time
 
-	noise := ""
-	above := 0
+	above := sample.HasNoise && sample.Noise > s.cfg.Threshold
 	if sample.HasNoise {
 		s.noise.Add(sample.Noise)
-		noise = fmt.Sprintf("%.4f", sample.Noise)
-		if sample.Noise > s.cfg.Threshold {
+		if above {
 			s.above++
-			above = 1
 		}
 	}
 
-	fmt.Fprintf(s.csv, "%d,%.3f,%.4f,%.4f,%.4f,%s,%d\n",
-		s.frames, t.Seconds(), sample.Mean, sample.Mean-s.firstLevel, sample.SpatialStd, noise, above)
+	p, state := s.partFor(sample)
+	if p != nil {
+		p.level.Add(sample.Mean)
+		if sample.HasNoise {
+			p.noise.Add(sample.Noise)
+			if above {
+				p.above++
+			}
+		}
+		if gray.Rows() == s.meta.Height && gray.Cols() == s.meta.Width {
+			p.collector.Add(gray)
+		}
+	}
+
+	s.writeRow(sample, t, above, state)
+
+	return t >= s.cfg.Duration()
+}
+
+// partFor picks the group the frame belongs to; nil means the frame is skipped (modulator transitions).
+func (s *Session) partFor(sample Sample) (*part, string) {
+	if s.classifier == nil {
+		return s.parts[0], "-"
+	}
+
+	state := s.classifier.Classify(sample.Mean, sample.Time)
+	prev := s.lastState
+	s.lastState = state
+
+	// the noise of a frame is measured against the previous one, so both must be in the same stable state
+	if state == prev {
+		switch state {
+		case StateOn:
+			return s.parts[0], state.String()
+		case StateOff:
+			return s.parts[1], state.String()
+		}
+	}
+	return nil, state.String()
+}
+
+// writeRow appends one CSV row and flushes to disk once a second.
+func (s *Session) writeRow(sample Sample, t time.Duration, above bool, state string) {
+	noise, aboveFlag := "", 0
+	if sample.HasNoise {
+		noise = fmt.Sprintf("%.4f", sample.Noise)
+	}
+	if above {
+		aboveFlag = 1
+	}
+
+	fmt.Fprintf(s.csv, "%d,%.3f,%.4f,%.4f,%.4f,%s,%d,%s\n",
+		s.frames, t.Seconds(), sample.Mean, sample.Mean-s.firstLevel, sample.SpatialStd, noise, aboveFlag, state)
 
 	if time.Since(s.lastFlush) >= flushInterval {
 		if err := s.csv.Flush(); err != nil {
@@ -159,27 +251,52 @@ func (s *Session) Add(sample Sample, gray gocv.Mat) bool {
 		}
 		s.lastFlush = time.Now()
 	}
-
-	if gray.Rows() == s.meta.Height && gray.Cols() == s.meta.Width {
-		s.collector.Add(gray)
-	}
-
-	return t >= s.cfg.Duration()
 }
 
-// Summary is the short result shown on screen and in the console.
+// effectiveFPS returns the frame rate actually received.
+func (s *Session) effectiveFPS() float64 {
+	if span := s.prevTime.Sub(s.firstTime); span > 0 {
+		return float64(s.frames-1) / span.Seconds()
+	}
+	return 0
+}
+
+// Summary is the short result shown on screen, in the console and in the mode matrix table.
+// In the modulator mode Level, AvgNoise and the field values describe the ON frames.
 type Summary struct {
 	Dir       string
+	Mode      Mode
+	Width     int
+	Height    int
+	FPS       float64 // reported by the driver
+	EffFPS    float64 // actually received
 	Frames    int
 	Elapsed   time.Duration
-	AvgNoise  float64
 	Threshold float64
-	AbovePct  float64
 	Drift     float64
+
+	Level         float64
+	AvgNoise      float64 // temporal noise, average over frames
+	AbovePct      float64
+	PixelNoise    float64 // average per-pixel temporal stddev
+	NonUniformity float64
+	RowFPN        float64
+	ColFPN        float64
+
+	OffLevel float64 // modulator only
+	OffNoise float64
+	Signal   float64 // ON - OFF level
+	SNR      float64 // Signal / ON temporal noise
+	Switches int
+	Period   float64 // seconds
 }
 
 // String formats the summary for notifications.
 func (s Summary) String() string {
+	if s.Mode == ModeModulator {
+		return fmt.Sprintf("signal %.2f DN, SNR %.1f, noise ON %.3f / OFF %.3f DN, %d switches",
+			s.Signal, s.SNR, s.AvgNoise, s.OffNoise, s.Switches)
+	}
 	return fmt.Sprintf("noise %.3f DN (thr %.1f, above %.1f%%), drift %+.2f DN, %d frames",
 		s.AvgNoise, s.Threshold, s.AbovePct, s.Drift, s.Frames)
 }
@@ -192,55 +309,101 @@ func (s *Session) Finish(stopped bool) (Summary, error) {
 	flushErr := s.csv.Flush()
 	closeErr := s.file.Close()
 
-	summary := Summary{
-		Dir:       s.dir,
-		Frames:    s.frames,
-		Elapsed:   elapsed,
-		AvgNoise:  s.noise.Mean(),
-		Threshold: s.cfg.Threshold,
-		Drift:     s.lastLevel - s.firstLevel,
+	for _, p := range s.parts {
+		if collected, _ := p.collector.Progress(); collected == 0 {
+			p.collector.Discard()
+			continue
+		}
+		p.report = p.collector.Finish()
+		p.field = analyzeField(p.report, s.cfg.Threshold)
+		p.done = true
+		s.saveMaps(p)
 	}
-	if s.noise.N > 0 {
-		summary.AbovePct = float64(s.above) / float64(s.noise.N) * 100
-	}
+	defer func() {
+		for _, p := range s.parts {
+			if p.done {
+				p.report.Close()
+			}
+		}
+	}()
+
+	summary := s.summary(elapsed)
 
 	if flushErr != nil || closeErr != nil {
 		return summary, fmt.Errorf("save data.csv: flush=%v close=%v", flushErr, closeErr)
 	}
 
-	if collected, _ := s.collector.Progress(); collected == 0 {
-		s.collector.Discard()
-		return summary, fmt.Errorf("no frames recorded")
-	}
-
-	report := s.collector.Finish()
-	defer report.Close()
-
-	field := analyzeField(report, s.cfg.Threshold)
-
-	maps := []struct {
-		name string
-		save func() error
-	}{
-		{"mean.png", func() error { return diagnostics.SaveMeanMap(report, filepath.Join(s.dir, "mean.png")) }},
-		{"noise_map.png", func() error {
-			return diagnostics.SaveNoiseMap(report, filepath.Join(s.dir, "noise_map.png"), max(3*field.AvgNoise, s.cfg.Threshold))
-		}},
-		{"defects.png", func() error { return diagnostics.SaveDefectMap(report, filepath.Join(s.dir, "defects.png")) }},
-	}
-	for _, m := range maps {
-		if err := m.save(); err != nil {
-			slog.Error("experiment map save", "file", m.name, "err", err)
-		}
-	}
-
-	text := s.reportText(report, field, elapsed, stopped)
+	text := s.reportText(elapsed, stopped)
 	if err := os.WriteFile(filepath.Join(s.dir, "report.txt"), []byte(text), 0644); err != nil {
 		return summary, fmt.Errorf("write report: %w", err)
 	}
 
-	slog.Info("experiment finished", "dir", s.dir, "frames", s.frames, "avg_noise", summary.AvgNoise, "drift", summary.Drift)
+	if !s.parts[0].done {
+		return summary, fmt.Errorf("no usable frames recorded")
+	}
+
+	slog.Info("experiment finished", "dir", s.dir, "frames", s.frames, "summary", summary.String())
 	fmt.Printf("\nExperiment finished (%s): %s\n  Report: %s\n", FormatDuration(elapsed), summary.String(), filepath.Join(s.dir, "report.txt"))
 
 	return summary, nil
+}
+
+// summary collects the key numbers of the run.
+func (s *Session) summary(elapsed time.Duration) Summary {
+	primary := s.parts[0]
+
+	sum := Summary{
+		Dir:       s.dir,
+		Mode:      s.cfg.Mode,
+		Width:     s.meta.Width,
+		Height:    s.meta.Height,
+		FPS:       s.meta.FPS,
+		EffFPS:    s.effectiveFPS(),
+		Frames:    s.frames,
+		Elapsed:   elapsed,
+		Threshold: s.cfg.Threshold,
+		Drift:     s.lastLevel - s.firstLevel,
+		Level:     primary.level.Mean(),
+		AvgNoise:  primary.noise.Mean(),
+		AbovePct:  primary.abovePct(),
+	}
+
+	if primary.done {
+		sum.PixelNoise = primary.field.AvgNoise
+		sum.NonUniformity = primary.field.NonUniformity
+		sum.RowFPN = primary.field.RowFPN
+		sum.ColFPN = primary.field.ColFPN
+	}
+
+	if s.classifier != nil {
+		off := s.parts[1]
+		sum.OffLevel = off.level.Mean()
+		sum.OffNoise = off.noise.Mean()
+		sum.Signal = sum.Level - sum.OffLevel
+		if sum.AvgNoise > 0 {
+			sum.SNR = sum.Signal / sum.AvgNoise
+		}
+		sum.Switches = s.classifier.Switches
+		sum.Period = s.classifier.Period()
+	}
+
+	return sum
+}
+
+// saveMaps writes the average frame, the noise heat map and the defect map of one part.
+func (s *Session) saveMaps(p *part) {
+	path := func(name string) string {
+		return filepath.Join(s.dir, name+p.suffix()+".png")
+	}
+
+	errs := []error{
+		diagnostics.SaveMeanMap(p.report, path("mean")),
+		diagnostics.SaveNoiseMap(p.report, path("noise_map"), max(3*p.field.AvgNoise, s.cfg.Threshold)),
+		diagnostics.SaveDefectMap(p.report, path("defects")),
+	}
+	for _, err := range errs {
+		if err != nil {
+			slog.Error("experiment map save", "err", err)
+		}
+	}
 }

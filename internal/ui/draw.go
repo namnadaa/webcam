@@ -81,6 +81,7 @@ func DrawMenu(img *gocv.Mat) {
 		"[H] Experiment Duration",
 		"[-/=] Noise Threshold",
 		"[V] Noise Graph Window",
+		"[U] Mode Matrix Start/Abort",
 		"[L] Lock Auto Exposure/WB/Focus",
 		"",
 		"[TAB] Close Menu",
@@ -175,6 +176,8 @@ type ExperimentInfo struct {
 	Noise     float64
 	HasNoise  bool
 	Level     float64
+	Light     string // modulator light state, "" in other modes
+	Matrix    string // mode matrix progress, "" when no matrix runs
 }
 
 // DrawExperiment renders experiment settings and the live noise level against the threshold
@@ -183,8 +186,15 @@ func DrawExperiment(img *gocv.Mat, info ExperimentInfo) {
 	x := leftPadding
 	y := img.Rows() - topPadding - 2*lineHeight
 
+	if info.Matrix != "" {
+		drawText(img, "MATRIX "+info.Matrix+"  [U] abort", x, y-lineHeight, color.RGBA{255, 200, 0, 0})
+	}
+
 	if info.Running {
 		line := fmt.Sprintf("EXP %s  %s / %s  [B] stop", info.Mode, info.Elapsed, info.Duration)
+		if info.Light != "" {
+			line = fmt.Sprintf("EXP %s [%s]  %s / %s  [B] stop", info.Mode, info.Light, info.Elapsed, info.Duration)
+		}
 		drawText(img, line, x, y, color.RGBA{255, 80, 80, 0})
 	} else {
 		line := fmt.Sprintf("Exp: %s [G] | %s [H] | thr %.1f DN [-/=]", info.Mode, info.Duration, info.Threshold)

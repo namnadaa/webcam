@@ -56,6 +56,7 @@ func main() {
 		camera.PrintModes(modes)
 
 		width, height, fps, changed := camera.AskCameraSettings(modes)
+		steps := matrixSteps(camera.AskMatrix(modes))
 
 		cfg := camera.Config{
 			Index:  selected.Index,
@@ -80,6 +81,9 @@ func main() {
 
 		exp := experiment.NewController()
 		var noiseGraph *graph.Graph
+
+		var matrix *experiment.Matrix
+		var matrixHome camera.Config // camera settings to return to after the matrix
 		fmt.Printf("\nNoise threshold: %.1f DN (change with -/= in the camera window)\n", exp.Config.Threshold)
 
 		for {
@@ -100,6 +104,7 @@ func main() {
 			}
 
 			exp.ResetMeter()
+			openedAt := time.Now()
 
 			slog.Info(
 				"camera settings applied",
@@ -146,7 +151,36 @@ func main() {
 							return
 						}
 
+						if matrix != nil && blockedDuringMatrix(action) {
+							uiState.ShowNotification("Mode matrix running, [U] aborts it", 2*time.Second)
+							action = actions.ActionNone
+						}
+
+						switchCamera := false
+
 						switch action {
+						case actions.ActionToggleMatrix:
+							switch {
+							case matrix != nil:
+								if exp.Running() {
+									exp.Stop()
+								}
+								saveMatrix(matrix, true)
+								matrix = nil
+								cfg = matrixHome
+								resolutionIndex, fpsIndex = camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS)
+								switchCamera = true
+							case len(steps) == 0:
+								uiState.ShowNotification("No modes selected for the matrix at startup", 3*time.Second)
+							case exp.Running():
+								uiState.ShowNotification("Stop the experiment first ([B])", 3*time.Second)
+							default:
+								matrixHome = cfg
+								matrix = experiment.NewMatrix(steps, exp.Config)
+								applyStep(&cfg, matrix.Current())
+								fmt.Printf("\nMode matrix started: %d modes, %s\n", len(steps), exp.Config.String())
+								switchCamera = true
+							}
 						case actions.ActionToggleAutoLock:
 							uiState.ShowNotification(toggleAutoLock(cam, &autoLocked, &savedControls), 3*time.Second)
 						case actions.ActionNextExperimentMode:
@@ -158,21 +192,13 @@ func main() {
 						case actions.ActionThresholdDown:
 							uiState.ShowNotification(exp.AdjustThreshold(-experiment.ThresholdStep), 2*time.Second)
 						case actions.ActionToggleExperiment:
-							meta := experiment.Meta{
-								Camera:     selected.Name,
-								Width:      f.Raw.Cols(),
-								Height:     f.Raw.Rows(),
-								FPS:        actualFPS,
-								Format:     format,
-								AutoLocked: autoLocked,
-								Controls:   cam.ReadControls().String(),
-							}
+							meta := experimentMeta(cam, f, selected.Name, actualFPS, format, autoLocked)
 							uiState.ShowNotification(exp.Toggle(meta), 5*time.Second)
 						case actions.ActionToggleGraph:
 							uiState.ShowNotification(toggleGraph(&noiseGraph), 3*time.Second)
 						}
 
-						cameraChanged := actions.HandleAction(action, modes, &cfg, &resolutionIndex, &fpsIndex)
+						cameraChanged := switchCamera || actions.HandleAction(action, modes, &cfg, &resolutionIndex, &fpsIndex)
 						if cameraChanged {
 							safeClose(done)
 							wg.Wait()
@@ -195,8 +221,33 @@ func main() {
 							uiState.ShowNotification("Screenshot saved", 2*time.Second)
 						}
 
-						if msg := exp.Update(f.Raw, f.Time); msg != "" {
+						msg, finished := exp.Update(f.Raw, f.Time)
+						if msg != "" {
 							uiState.ShowNotification(msg, 8*time.Second)
+						}
+
+						if matrix != nil && finished != nil {
+							if matrix.Record(*finished) {
+								applyStep(&cfg, matrix.Current())
+							} else {
+								saveMatrix(matrix, false)
+								matrix = nil
+								cfg = matrixHome
+								resolutionIndex, fpsIndex = camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS)
+							}
+
+							safeClose(done)
+							wg.Wait()
+
+							restartCamera = true
+							runCamera = false
+							return
+						}
+
+						if matrix != nil && !exp.Running() && time.Since(openedAt) >= experiment.Warmup {
+							meta := experimentMeta(cam, f, selected.Name, actualFPS, format, autoLocked)
+							fmt.Printf("\nMode matrix %s: %s\n", matrix.Progress(), matrix.Current())
+							uiState.ShowNotification(exp.Toggle(meta), 3*time.Second)
 						}
 
 						if noiseGraph != nil {
@@ -219,7 +270,7 @@ func main() {
 							actualH,
 							selected.Name,
 							f.Time,
-							experimentInfo(exp),
+							experimentInfo(exp, matrix),
 						)
 
 						recorder.Write(f.Img)
@@ -255,6 +306,9 @@ func main() {
 		}
 
 		exp.Close()
+		if matrix != nil {
+			saveMatrix(matrix, true)
+		}
 		if noiseGraph != nil {
 			toggleGraph(&noiseGraph)
 		}
@@ -263,9 +317,72 @@ func main() {
 	}
 }
 
+// experimentMeta describes the current capture conditions for an experiment report.
+func experimentMeta(cam *camera.Camera, f pipeline.Frame, cameraName string, fps float64, format string, autoLocked bool) experiment.Meta {
+	return experiment.Meta{
+		Camera:     cameraName,
+		Width:      f.Raw.Cols(),
+		Height:     f.Raw.Rows(),
+		FPS:        fps,
+		Format:     format,
+		AutoLocked: autoLocked,
+		Controls:   cam.ReadControls().String(),
+	}
+}
+
+// matrixSteps expands the selected resolutions into camera modes, one per frame rate.
+func matrixSteps(modes []camera.Mode) []experiment.Step {
+	var steps []experiment.Step
+	for _, m := range modes {
+		if len(m.FPS) == 0 {
+			steps = append(steps, experiment.Step{Width: m.Width, Height: m.Height})
+			continue
+		}
+		for _, fps := range m.FPS {
+			steps = append(steps, experiment.Step{Width: m.Width, Height: m.Height, FPS: fps})
+		}
+	}
+	return steps
+}
+
+// applyStep switches the camera config to a matrix step.
+func applyStep(cfg *camera.Config, step experiment.Step) {
+	cfg.Width = step.Width
+	cfg.Height = step.Height
+	cfg.FPS = step.FPS
+}
+
+// saveMatrix writes the matrix summary, logging a failure.
+func saveMatrix(m *experiment.Matrix, aborted bool) {
+	if _, err := m.Save(aborted); err != nil {
+		slog.Error("mode matrix save", "err", err)
+	}
+}
+
+// blockedDuringMatrix reports whether the action would interfere with a running mode matrix.
+func blockedDuringMatrix(action actions.CameraAction) bool {
+	switch action {
+	case actions.ActionNextResolution, actions.ActionPrevResolution,
+		actions.ActionNextFPS, actions.ActionPrevFPS,
+		actions.ActionToggleExperiment, actions.ActionNextExperimentMode,
+		actions.ActionNextExperimentDuration, actions.ActionThresholdUp, actions.ActionThresholdDown:
+		return true
+	}
+	return false
+}
+
 // experimentInfo collects what the on-screen experiment panel shows.
-func experimentInfo(exp *experiment.Controller) ui.ExperimentInfo {
+func experimentInfo(exp *experiment.Controller, matrix *experiment.Matrix) ui.ExperimentInfo {
 	last := exp.Last()
+
+	matrixText := ""
+	if matrix != nil {
+		matrixText = matrix.Progress() + " " + matrix.Current().String()
+		if !exp.Running() {
+			matrixText += " warming up"
+		}
+	}
+
 	return ui.ExperimentInfo{
 		Mode:      exp.Config.Mode.String(),
 		Duration:  experiment.FormatDuration(exp.Config.Duration()),
@@ -275,6 +392,8 @@ func experimentInfo(exp *experiment.Controller) ui.ExperimentInfo {
 		Noise:     last.Noise,
 		HasNoise:  last.HasNoise,
 		Level:     last.Mean,
+		Light:     exp.LightState(),
+		Matrix:    matrixText,
 	}
 }
 

@@ -65,3 +65,29 @@ func TestFormatFPS(t *testing.T) {
 		t.Errorf("FormatFPS(nil) = %q", got)
 	}
 }
+
+func TestParseSelection(t *testing.T) {
+	tests := []struct {
+		input   string
+		want    []int
+		wantErr bool
+	}{
+		{"all", []int{0, 1, 2}, false},
+		{"3,1", []int{2, 0}, false},
+		{"2, 2", []int{1}, false},
+		{"0", nil, true},
+		{"4", nil, true},
+		{"1,x", nil, true},
+	}
+
+	for _, tt := range tests {
+		got, err := ParseSelection(tt.input, 3)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("ParseSelection(%q) err = %v, wantErr %v", tt.input, err, tt.wantErr)
+			continue
+		}
+		if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("ParseSelection(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}

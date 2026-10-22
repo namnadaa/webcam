@@ -13,6 +13,7 @@ const (
 	ModeDark      Mode = iota // lens covered: dark noise and dark signal non-uniformity
 	ModeLight                 // uniform illumination: shot noise and photo response non-uniformity
 	ModeStability             // fixed scene: drift of level and noise over time and across the field
+	ModeModulator             // light switched on and off: noise of both states and the ON/OFF signal
 	modeCount
 )
 
@@ -25,6 +26,8 @@ func (m Mode) String() string {
 		return "light"
 	case ModeStability:
 		return "stability"
+	case ModeModulator:
+		return "modulator"
 	}
 	return "unknown"
 }
@@ -38,6 +41,8 @@ func (m Mode) Hint() string {
 		return "point at a uniform light source, avoid saturation"
 	case ModeStability:
 		return "fixed camera and static scene"
+	case ModeModulator:
+		return "switch the light on and off, keep the camera still"
 	}
 	return ""
 }

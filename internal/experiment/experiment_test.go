@@ -61,7 +61,7 @@ func TestConfig(t *testing.T) {
 		t.Errorf("duration did not cycle back: %d", c.DurationIndex)
 	}
 
-	if ModeStability.Next() != ModeDark {
+	if ModeModulator.Next() != ModeDark {
 		t.Error("mode did not cycle back to dark")
 	}
 }
@@ -152,7 +152,7 @@ func TestSessionWritesResults(t *testing.T) {
 	}
 
 	report, _ := os.ReadFile(filepath.Join(summary.Dir, "report.txt"))
-	for _, want := range []string{"stopped by user", "Pixel noise:      avg 1.0000", "NOT locked", "ZONES 8x6", "effective 30.30 FPS"} {
+	for _, want := range []string{"stopped by user", "Pixel noise:      avg 1.0000", "NOT locked", "Zones 8x6", "effective 30.30 FPS"} {
 		if !strings.Contains(string(report), want) {
 			t.Errorf("report.txt does not contain %q", want)
 		}

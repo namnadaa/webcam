@@ -66,6 +66,9 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	case int('v'), int('V'): // real-time noise graph window
 		action = actions.ActionToggleGraph
 
+	case int('u'), int('U'): // run the experiment over the selected camera modes
+		action = actions.ActionToggleMatrix
+
 	case int('l'), int('L'): // lock / unlock auto exposure, white balance, focus
 		action = actions.ActionToggleAutoLock
 
