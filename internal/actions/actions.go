@@ -61,6 +61,7 @@ func HandleAction(action CameraAction, modes []camera.Mode, cfg *camera.Config, 
 
 		cfg.Width = mode.Width
 		cfg.Height = mode.Height
+		cfg.Format = mode.Format
 		if len(mode.FPS) > 0 {
 			cfg.FPS = mode.FPS[*fpsIndex]
 		}

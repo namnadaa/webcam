@@ -20,10 +20,14 @@ type Step struct {
 	Width  int
 	Height int
 	FPS    float64
+	Format string // pixel format to request, "" = driver default
 }
 
-// String returns the mode as "1280x720@30".
+// String returns the mode as "1280x720@30" or "1280x720@30 MJPG".
 func (s Step) String() string {
+	if s.Format != "" {
+		return fmt.Sprintf("%dx%d@%g %s", s.Width, s.Height, s.FPS, s.Format)
+	}
 	return fmt.Sprintf("%dx%d@%g", s.Width, s.Height, s.FPS)
 }
 

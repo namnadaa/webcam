@@ -221,23 +221,11 @@ type Settings struct {
 // AskCameraSettings optionally prompts the user to pick one of the supported modes (printed by PrintModes)
 // and a pixel format. Returns false when the user keeps the camera defaults.
 func AskCameraSettings(modes []Mode) (Settings, bool) {
-	var choice string
-
-	for {
-		fmt.Print("\nChange camera settings? (y/n): ")
-		fmt.Scan(&choice)
-		choice = strings.ToLower(strings.TrimSpace(choice))
-		if choice == "y" || choice == "n" {
-			break
-		}
-		fmt.Println("Please enter 'y' or 'n'")
-	}
-
-	if choice != "y" || len(modes) == 0 {
+	if len(modes) == 0 || !askYesNo("\nChange camera settings? (y/n)") {
 		return Settings{}, false
 	}
 
-	m := modes[askNumber("Select resolution", len(modes))-1]
+	m := modes[askNumber("Select mode", len(modes))-1]
 
 	fps := 0.0
 	if len(m.FPS) > 0 {
@@ -248,7 +236,30 @@ func AskCameraSettings(modes []Mode) (Settings, bool) {
 		fps = m.FPS[askNumber("Select FPS", len(m.FPS))-1]
 	}
 
-	return Settings{Width: m.Width, Height: m.Height, FPS: fps, Format: askFormat()}, true
+	format := m.Format
+	if format == "" {
+		format = askFormat()
+	}
+
+	return Settings{Width: m.Width, Height: m.Height, FPS: fps, Format: format}, true
+}
+
+// askYesNo prints the prompt and repeats until the answer is 'y' or 'n'.
+func askYesNo(prompt string) bool {
+	var choice string
+
+	for {
+		fmt.Print(prompt + ": ")
+		fmt.Scan(&choice)
+
+		switch strings.ToLower(strings.TrimSpace(choice)) {
+		case "y":
+			return true
+		case "n":
+			return false
+		}
+		fmt.Println("Please enter 'y' or 'n'")
+	}
 }
 
 // askFormat lets the user pick a pixel format or keep the driver default.

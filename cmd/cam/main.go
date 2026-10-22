@@ -47,12 +47,7 @@ func main() {
 			return
 		}
 
-		fmt.Println("\nProbing supported modes...")
-		modes, err := camera.ProbeModes(selected.Index, camera.APIAny)
-		if err != nil || len(modes) == 0 {
-			slog.Warn("could not probe camera modes, using presets", "err", err)
-			modes = camera.PresetModes()
-		}
+		modes := camera.ChooseModes(*selected)
 		camera.PrintModes(modes)
 
 		settings, changed := camera.AskCameraSettings(modes)
@@ -73,7 +68,7 @@ func main() {
 			cfg.Format = settings.Format
 		}
 
-		resolutionIndex, fpsIndex := camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS)
+		resolutionIndex, fpsIndex := camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS, cfg.Format)
 
 		restartCamera := false
 
@@ -174,7 +169,7 @@ func main() {
 								saveMatrix(matrix, true)
 								matrix = nil
 								cfg = matrixHome
-								resolutionIndex, fpsIndex = camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS)
+								resolutionIndex, fpsIndex = camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS, cfg.Format)
 								switchCamera = true
 							case len(steps) == 0:
 								uiState.ShowNotification("No modes selected for the matrix at startup", 3*time.Second)
@@ -239,7 +234,7 @@ func main() {
 								saveMatrix(matrix, false)
 								matrix = nil
 								cfg = matrixHome
-								resolutionIndex, fpsIndex = camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS)
+								resolutionIndex, fpsIndex = camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS, cfg.Format)
 							}
 
 							safeClose(done)
@@ -343,11 +338,11 @@ func matrixSteps(modes []camera.Mode) []experiment.Step {
 	var steps []experiment.Step
 	for _, m := range modes {
 		if len(m.FPS) == 0 {
-			steps = append(steps, experiment.Step{Width: m.Width, Height: m.Height})
+			steps = append(steps, experiment.Step{Width: m.Width, Height: m.Height, Format: m.Format})
 			continue
 		}
 		for _, fps := range m.FPS {
-			steps = append(steps, experiment.Step{Width: m.Width, Height: m.Height, FPS: fps})
+			steps = append(steps, experiment.Step{Width: m.Width, Height: m.Height, FPS: fps, Format: m.Format})
 		}
 	}
 	return steps
@@ -358,6 +353,7 @@ func applyStep(cfg *camera.Config, step experiment.Step) {
 	cfg.Width = step.Width
 	cfg.Height = step.Height
 	cfg.FPS = step.FPS
+	cfg.Format = step.Format
 }
 
 // saveMatrix writes the matrix summary, logging a failure.
