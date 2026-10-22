@@ -48,7 +48,7 @@ func CompareCameras(cameras []Config) {
 // PrintCameraList prints available cameras with their type (internal/external).
 func PrintCameraList(cameras []Config) {
 	fmt.Println("Available cameras:")
-	for _, cam := range cameras {
-		fmt.Printf("[%d] - %s\n", cam.Index, cam.Name)
+	for i, cam := range cameras {
+		fmt.Printf("[%d] - %s\n", i+1, cam.Name)
 	}
 }

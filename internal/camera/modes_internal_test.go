@@ -91,3 +91,16 @@ func TestParseSelection(t *testing.T) {
 		}
 	}
 }
+
+func TestFindCameraByNumber(t *testing.T) {
+	cameras := []Config{{Index: 0, Name: "Camera 1"}, {Index: 2, Name: "Camera 2"}}
+
+	if cam, ok := findCameraByNumber(cameras, 2); !ok || cam.Index != 2 {
+		t.Errorf("number 2 = %+v %v, want device index 2", cam, ok)
+	}
+	for _, n := range []int{0, 3} {
+		if _, ok := findCameraByNumber(cameras, n); ok {
+			t.Errorf("number %d found, want not found", n)
+		}
+	}
+}
