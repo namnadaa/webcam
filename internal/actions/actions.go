@@ -21,6 +21,7 @@ const (
 	ActionThresholdDown
 	ActionToggleGraph
 	ActionToggleMatrix
+	ActionDriverSettings
 )
 
 // HandleAction updates camera config using keyboard actions.

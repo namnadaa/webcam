@@ -31,8 +31,10 @@ func main() {
 
 	runtime.LockOSThread()
 
+	api := camera.ChooseBackend()
+
 	for {
-		cams := camera.FindCameras()
+		cams := camera.FindCameras(api)
 		if len(cams) == 0 {
 			slog.Warn("No cameras found")
 			return
@@ -55,7 +57,7 @@ func main() {
 
 		cfg := camera.Config{
 			Index:  selected.Index,
-			API:    camera.APIAny,
+			API:    selected.API,
 			Width:  selected.Width,
 			Height: selected.Height,
 			FPS:    selected.FPS,
@@ -113,6 +115,7 @@ func main() {
 				"fps", actualFPS,
 				"format", format,
 				"requested_format", cfg.Format,
+				"backend", cam.Backend(),
 				"controls", cam.ReadControls().String(),
 			)
 
@@ -183,7 +186,9 @@ func main() {
 								switchCamera = true
 							}
 						case actions.ActionToggleAutoLock:
-							uiState.ShowNotification(toggleAutoLock(cam, &autoLocked, &savedControls), 3*time.Second)
+							uiState.ShowNotification(toggleAutoLock(cam, &autoLocked, &savedControls), 5*time.Second)
+						case actions.ActionDriverSettings:
+							uiState.ShowNotification(openDriverSettings(cam), 5*time.Second)
 						case actions.ActionNextExperimentMode:
 							uiState.ShowNotification(exp.NextMode(), 3*time.Second)
 						case actions.ActionNextExperimentDuration:
@@ -323,6 +328,7 @@ func main() {
 func experimentMeta(cam *camera.Camera, f pipeline.Frame, cameraName string, fps float64, format, requested string, autoLocked bool) experiment.Meta {
 	return experiment.Meta{
 		Camera:     cameraName,
+		Backend:    cam.Backend(),
 		Width:      f.Raw.Cols(),
 		Height:     f.Raw.Rows(),
 		FPS:        fps,
@@ -434,16 +440,42 @@ func toggleAutoLock(cam *camera.Camera, locked *bool, saved *camera.Controls) st
 	}
 
 	before, after := cam.LockAuto()
-	slog.Info("auto controls lock", "before", before.String(), "after", after.String())
+	backend := cam.Backend()
+	slog.Info("auto controls lock", "backend", backend, "before", before.String(), "after", after.String())
+
+	if !before.Reported() && !after.Reported() {
+		fmt.Printf("\nAuto controls lock: the %s backend does not give access to exposure, white balance and focus\n", backend)
+		if runtime.GOOS == "windows" {
+			fmt.Println("Restart the program and choose the DirectShow backend, or set the camera manually with [O]")
+		}
+		return "Auto controls not supported by " + backend + " backend"
+	}
 
 	applied := camera.LockApplied(before, after)
-	if len(applied) == 0 {
-		return "Auto controls lock not supported by camera backend"
+	fixed := camera.ValuesFixed(before)
+	if len(applied) == 0 && len(fixed) == 0 {
+		return "Auto controls lock ignored by the camera driver"
 	}
 
 	*saved = before
 	*locked = true
-	return "Locked: " + strings.Join(applied, ", ")
+	fmt.Printf("\nAuto controls locked (%s)\n  before: %s\n  after:  %s\n", backend, before, after)
+	if len(applied) > 0 {
+		return "Locked: " + strings.Join(applied, ", ")
+	}
+	return "Fixed at current values: " + strings.Join(fixed, ", ") + " (driver does not confirm)"
+}
+
+// openDriverSettings opens the camera driver's settings dialog, where auto exposure,
+// white balance and focus can be switched off by hand. Only DirectShow has the dialog.
+func openDriverSettings(cam *camera.Camera) string {
+	backend := cam.Backend()
+	if backend != camera.BackendName(camera.APIDShow) {
+		return "Driver settings dialog needs the DirectShow backend (now " + backend + ")"
+	}
+	cam.OpenDriverSettings()
+	slog.Info("driver settings dialog opened")
+	return "Driver settings opened: switch off Auto there"
 }
 
 // safeClose safely closes a channel if it has not been closed yet.

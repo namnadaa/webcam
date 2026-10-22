@@ -72,6 +72,9 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	case int('l'), int('L'): // lock / unlock auto exposure, white balance, focus
 		action = actions.ActionToggleAutoLock
 
+	case int('o'), int('O'): // camera driver settings dialog (DirectShow)
+		action = actions.ActionDriverSettings
+
 	case int('x'), int('X'): // screenshot
 		mediaState.Screenshot = true
 

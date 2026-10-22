@@ -161,8 +161,11 @@ func TestModeCache(t *testing.T) {
 		t.Error("cache of another device was accepted")
 	}
 
-	if p := cachePath("Camera 1"); p != filepath.Join(CacheDir, "modes_Camera_1.json") {
+	if p := cachePath(Config{Name: "Camera 1"}); p != filepath.Join(CacheDir, "modes_Camera_1.json") {
 		t.Errorf("cachePath = %q", p)
+	}
+	if p := cachePath(Config{Name: "Camera 1", API: APIDShow}); p != filepath.Join(CacheDir, "modes_Camera_1_DirectShow.json") {
+		t.Errorf("cachePath with backend = %q", p)
 	}
 }
 

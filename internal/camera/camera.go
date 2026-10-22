@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,25 @@ const (
 	APIAVFoundation = gocv.VideoCaptureAVFoundation // macOS AVFoundation
 	APIV4L2         = gocv.VideoCaptureV4L2         // Linux V4L2
 	APIMSMF         = gocv.VideoCaptureMSMF         // Windows Media Foundation
+	APIDShow        = gocv.VideoCaptureDshow        // Windows DirectShow
 )
+
+// BackendName returns a short name of a capture backend, e.g. "MSMF".
+func BackendName(api API) string {
+	switch api {
+	case APIAny:
+		return "auto"
+	case APIAVFoundation:
+		return "AVFoundation"
+	case APIV4L2:
+		return "V4L2"
+	case APIMSMF:
+		return "MSMF"
+	case APIDShow:
+		return "DirectShow"
+	}
+	return fmt.Sprintf("API %d", int(api))
+}
 
 // Config holds camera initialization parameters.
 type Config struct {
@@ -118,6 +137,17 @@ func (c *Camera) ActualSize() (w, h int) {
 	return int(wf + 0.5), int(hf + 0.5)
 }
 
+// Backend returns the name of the backend that actually opened the camera.
+func (c *Camera) Backend() string {
+	return BackendName(API(c.cap.Get(gocv.VideoCaptureBackend)))
+}
+
+// OpenDriverSettings opens the driver's own camera settings dialog.
+// Only DirectShow has one; other backends ignore the request.
+func (c *Camera) OpenDriverSettings() {
+	c.cap.Set(gocv.VideoCaptureSettings, 1)
+}
+
 // ActualFPS returns the applied frames per second.
 func (c *Camera) ActualFPS() float64 {
 	return c.cap.Get(gocv.VideoCaptureFPS)
@@ -159,8 +189,8 @@ func FourCCToString(fourcc int) string {
 	return strings.TrimRight(string(b), " ")
 }
 
-// FindCameras searches for connected cameras and returns the Config list.
-func FindCameras() []Config {
+// FindCameras searches for cameras connected through the given backend and returns the Config list.
+func FindCameras(api API) []Config {
 	var cameras []Config
 
 	const maxIndex = 20
@@ -171,7 +201,7 @@ func FindCameras() []Config {
 	for i := 0; i < maxIndex; i++ {
 		cfg := Config{
 			Index: i,
-			API:   APIAny,
+			API:   api,
 		}
 
 		cam, err := Open(cfg)
@@ -290,4 +320,21 @@ func askNumber(prompt string, max int) int {
 		}
 		fmt.Printf("Please enter a number from 1 to %d\n", max)
 	}
+}
+
+// ChooseBackend asks which capture backend to use. Only Windows has a choice:
+// Media Foundation is the default, DirectShow lets the program switch off auto exposure,
+// white balance and focus and opens the driver's settings dialog.
+func ChooseBackend() API {
+	if runtime.GOOS != "windows" {
+		return APIAny
+	}
+
+	fmt.Println("\nCamera backend:")
+	fmt.Println("[1] Media Foundation (default)")
+	fmt.Println("[2] DirectShow (recommended for experiments: auto controls lock [L], driver settings [O])")
+	if askNumber("Select backend", 2) == 2 {
+		return APIDShow
+	}
+	return APIMSMF
 }

@@ -26,6 +26,7 @@ const flushInterval = time.Second
 // Meta describes the capture conditions the experiment was run under.
 type Meta struct {
 	Camera     string
+	Backend    string // capture backend, e.g. "DirectShow"
 	Width      int
 	Height     int
 	FPS        float64 // reported by the driver

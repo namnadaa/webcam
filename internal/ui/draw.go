@@ -104,6 +104,7 @@ var menuLines = []string{
 	"[V] Noise Graph Window",
 	"[U] Mode Matrix Start/Abort",
 	"[L] Lock Auto Exposure/WB/Focus",
+	"[O] Driver Settings (DirectShow)",
 	"",
 	"[TAB] Close Menu",
 	"[ESC] Camera Menu",

@@ -208,14 +208,19 @@ func fingerprint(cam Config) string {
 
 var unsafeName = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 
-// cachePath returns the cache file for a camera name.
-func cachePath(name string) string {
+// cachePath returns the cache file for a camera; a backend chosen explicitly gets its own file,
+// because backends offer different modes for the same device.
+func cachePath(cam Config) string {
+	name := cam.Name
+	if cam.API != APIAny {
+		name += "_" + BackendName(cam.API)
+	}
 	return filepath.Join(CacheDir, "modes_"+strings.Trim(unsafeName.ReplaceAllString(name, "_"), "_")+".json")
 }
 
 // loadModes reads saved modes for the camera; false when there are none or they belong to another device.
 func loadModes(cam Config) (modeCache, bool) {
-	data, err := os.ReadFile(cachePath(cam.Name))
+	data, err := os.ReadFile(cachePath(cam))
 	if err != nil {
 		return modeCache{}, false
 	}
@@ -246,5 +251,5 @@ func saveModes(cam Config, modes []Mode) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(cachePath(cam.Name), data, 0644)
+	return os.WriteFile(cachePath(cam), data, 0644)
 }

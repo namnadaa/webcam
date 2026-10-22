@@ -22,7 +22,7 @@ func metaText(cfg Config, meta Meta, started time.Time) string {
 	fmt.Fprintf(&b, "Mode:             %s (%s)\n", cfg.Mode, cfg.Mode.Hint())
 	fmt.Fprintf(&b, "Planned duration: %s\n", FormatDuration(cfg.Duration()))
 	fmt.Fprintf(&b, "Noise threshold:  %.1f DN\n", cfg.Threshold)
-	fmt.Fprintf(&b, "Camera:           %s\n", meta.Camera)
+	fmt.Fprintf(&b, "Camera:           %s (backend: %s)\n", meta.Camera, meta.Backend)
 	fmt.Fprintf(&b, "Resolution:       %dx%d\n", meta.Width, meta.Height)
 	fmt.Fprintf(&b, "FPS (driver):     %.2f\n", meta.FPS)
 	fmt.Fprintf(&b, "Format:           %s (requested: %s)\n", meta.Format, requestedText(meta.Requested))
