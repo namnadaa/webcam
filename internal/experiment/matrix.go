@@ -1,13 +1,14 @@
 package experiment
 
 import (
-	"bufio"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
+	"webcam/internal/helpers"
 )
 
 // Warmup is how long the camera runs after a mode switch before the measurement starts,
@@ -95,19 +96,23 @@ func (m *Matrix) Save(aborted bool) (string, error) {
 // csv formats all results as a machine-readable table.
 func (m *Matrix) csv() string {
 	var b strings.Builder
-	w := bufio.NewWriter(&b)
 
-	fmt.Fprintln(w, "requested,width,height,fps_driver,fps_effective,frames,level,temporal_noise,above_threshold_pct,"+
-		"pixel_noise,non_uniformity,row_fpn,col_fpn,drift,off_level,off_noise,signal,snr,switches,period_s,dir")
+	b.WriteString(helpers.CSVBOM)
+	b.WriteString(helpers.CSVRow("requested", "width", "height", "fps_driver", "fps_effective", "frames", "level",
+		"temporal_noise", "above_threshold_pct", "pixel_noise", "non_uniformity", "row_fpn", "col_fpn", "drift",
+		"off_level", "off_noise", "signal", "snr", "switches", "period_s", "dir"))
 
+	f := helpers.CSVFloat
 	for i, r := range m.results {
-		fmt.Fprintf(w, "%s,%d,%d,%.2f,%.2f,%d,%.4f,%.4f,%.2f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f,%d,%.3f,%s\n",
-			m.steps[i], r.Width, r.Height, r.FPS, r.EffFPS, r.Frames, r.Level, r.AvgNoise, r.AbovePct,
-			r.PixelNoise, r.NonUniformity, r.RowFPN, r.ColFPN, r.Drift,
-			r.OffLevel, r.OffNoise, r.Signal, r.SNR, r.Switches, r.Period, r.Dir)
+		b.WriteString(helpers.CSVRow(
+			m.steps[i].String(), strconv.Itoa(r.Width), strconv.Itoa(r.Height),
+			f(r.FPS, 2), f(r.EffFPS, 2), strconv.Itoa(r.Frames), f(r.Level, 4), f(r.AvgNoise, 4), f(r.AbovePct, 2),
+			f(r.PixelNoise, 4), f(r.NonUniformity, 4), f(r.RowFPN, 4), f(r.ColFPN, 4), f(r.Drift, 4),
+			f(r.OffLevel, 4), f(r.OffNoise, 4), f(r.Signal, 4), f(r.SNR, 2), strconv.Itoa(r.Switches), f(r.Period, 3),
+			r.Dir,
+		))
 	}
 
-	_ = w.Flush()
 	return b.String()
 }
 

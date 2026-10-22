@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 	"webcam/internal/diagnostics"
+	"webcam/internal/helpers"
 
 	"gocv.io/x/gocv"
 )
@@ -113,7 +115,8 @@ func Start(cfg Config, meta Meta, rows, cols int) (*Session, error) {
 	}
 
 	w := bufio.NewWriter(file)
-	fmt.Fprintln(w, "frame,t_sec,mean,drift,spatial_std,temporal_noise,above_threshold,state")
+	w.WriteString(helpers.CSVBOM)
+	w.WriteString(helpers.CSVRow("frame", "t_sec", "mean", "drift", "spatial_std", "temporal_noise", "above_threshold", "state"))
 
 	s := &Session{
 		cfg:       cfg,
@@ -234,16 +237,24 @@ func (s *Session) partFor(sample Sample) (*part, string) {
 
 // writeRow appends one CSV row and flushes to disk once a second.
 func (s *Session) writeRow(sample Sample, t time.Duration, above bool, state string) {
-	noise, aboveFlag := "", 0
+	noise, aboveFlag := "", "0"
 	if sample.HasNoise {
-		noise = fmt.Sprintf("%.4f", sample.Noise)
+		noise = helpers.CSVFloat(sample.Noise, 4)
 	}
 	if above {
-		aboveFlag = 1
+		aboveFlag = "1"
 	}
 
-	fmt.Fprintf(s.csv, "%d,%.3f,%.4f,%.4f,%.4f,%s,%d,%s\n",
-		s.frames, t.Seconds(), sample.Mean, sample.Mean-s.firstLevel, sample.SpatialStd, noise, aboveFlag, state)
+	s.csv.WriteString(helpers.CSVRow(
+		strconv.Itoa(s.frames),
+		helpers.CSVFloat(t.Seconds(), 3),
+		helpers.CSVFloat(sample.Mean, 4),
+		helpers.CSVFloat(sample.Mean-s.firstLevel, 4),
+		helpers.CSVFloat(sample.SpatialStd, 4),
+		noise,
+		aboveFlag,
+		state,
+	))
 
 	if time.Since(s.lastFlush) >= flushInterval {
 		if err := s.csv.Flush(); err != nil {

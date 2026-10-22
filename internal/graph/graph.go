@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"webcam/internal/helpers"
 
 	"gocv.io/x/gocv"
 )
@@ -87,7 +88,8 @@ func Open() (*Graph, error) {
 	}
 
 	w := bufio.NewWriter(file)
-	fmt.Fprintln(w, "time,t_sec,mean,temporal_noise,threshold,above_threshold")
+	w.WriteString(helpers.CSVBOM)
+	w.WriteString(helpers.CSVRow("time", "t_sec", "mean", "temporal_noise", "threshold", "above_threshold"))
 
 	slog.Info("noise graph opened", "file", path)
 
@@ -139,16 +141,22 @@ func (g *Graph) Add(p Point, threshold float64) {
 
 // log appends a CSV row and flushes it to disk once a second.
 func (g *Graph) log(p Point, threshold float64) {
-	noise, above := "", 0
+	noise, above := "", "0"
 	if p.HasNoise {
-		noise = fmt.Sprintf("%.4f", p.Noise)
+		noise = helpers.CSVFloat(p.Noise, 4)
 		if p.Noise > threshold {
-			above = 1
+			above = "1"
 		}
 	}
 
-	fmt.Fprintf(g.csv, "%s,%.3f,%.4f,%s,%.1f,%d\n",
-		p.Time.Format("15:04:05.000"), p.Time.Sub(g.opened).Seconds(), p.Mean, noise, threshold, above)
+	g.csv.WriteString(helpers.CSVRow(
+		p.Time.Format("15:04:05.000"),
+		helpers.CSVFloat(p.Time.Sub(g.opened).Seconds(), 3),
+		helpers.CSVFloat(p.Mean, 4),
+		noise,
+		helpers.CSVFloat(threshold, 1),
+		above,
+	))
 
 	if time.Since(g.lastFlush) >= flushInterval {
 		if err := g.csv.Flush(); err != nil {

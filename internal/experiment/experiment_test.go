@@ -147,8 +147,15 @@ func TestSessionWritesResults(t *testing.T) {
 		}
 	}
 
-	if lines := readLines(t, filepath.Join(summary.Dir, "data.csv")); len(lines) != 5 {
-		t.Errorf("data.csv has %d lines, want header + 4", len(lines))
+	lines := readLines(t, filepath.Join(summary.Dir, "data.csv"))
+	if len(lines) != 5 {
+		t.Fatalf("data.csv has %d lines, want header + 4", len(lines))
+	}
+	if !strings.HasPrefix(lines[0], "\uFEFFframe;t_sec;") {
+		t.Errorf("data.csv header = %q, want BOM and ';' separators", lines[0])
+	}
+	if want := "2;0,033;12,0000;2,0000;0,0000;0,0000;0;-"; lines[2] != want {
+		t.Errorf("data.csv row 2 = %q, want %q", lines[2], want)
 	}
 
 	report, _ := os.ReadFile(filepath.Join(summary.Dir, "report.txt"))
