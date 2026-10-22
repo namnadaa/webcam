@@ -19,6 +19,7 @@ const (
 	ActionNextExperimentDuration
 	ActionThresholdUp
 	ActionThresholdDown
+	ActionToggleGraph
 )
 
 // HandleAction updates camera config using keyboard actions.

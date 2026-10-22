@@ -80,6 +80,7 @@ func DrawMenu(img *gocv.Mat) {
 		"[G] Experiment Mode",
 		"[H] Experiment Duration",
 		"[-/=] Noise Threshold",
+		"[V] Noise Graph Window",
 		"[L] Lock Auto Exposure/WB/Focus",
 		"",
 		"[TAB] Close Menu",

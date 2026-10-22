@@ -12,6 +12,7 @@ import (
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
 	"webcam/internal/experiment"
+	"webcam/internal/graph"
 	"webcam/internal/helpers"
 	"webcam/internal/logger"
 	"webcam/internal/media"
@@ -78,6 +79,7 @@ func main() {
 		var savedControls camera.Controls
 
 		exp := experiment.NewController()
+		var noiseGraph *graph.Graph
 		fmt.Printf("\nNoise threshold: %.1f DN (change with -/= in the camera window)\n", exp.Config.Threshold)
 
 		for {
@@ -166,6 +168,8 @@ func main() {
 								Controls:   cam.ReadControls().String(),
 							}
 							uiState.ShowNotification(exp.Toggle(meta), 5*time.Second)
+						case actions.ActionToggleGraph:
+							uiState.ShowNotification(toggleGraph(&noiseGraph), 3*time.Second)
 						}
 
 						cameraChanged := actions.HandleAction(action, modes, &cfg, &resolutionIndex, &fpsIndex)
@@ -193,6 +197,16 @@ func main() {
 
 						if msg := exp.Update(f.Raw, f.Time); msg != "" {
 							uiState.ShowNotification(msg, 8*time.Second)
+						}
+
+						if noiseGraph != nil {
+							last := exp.Last()
+							noiseGraph.Add(graph.Point{
+								Time:     last.Time,
+								Mean:     last.Mean,
+								Noise:    last.Noise,
+								HasNoise: last.HasNoise,
+							}, exp.Config.Threshold)
 						}
 
 						ui.RenderOverlay(
@@ -241,6 +255,9 @@ func main() {
 		}
 
 		exp.Close()
+		if noiseGraph != nil {
+			toggleGraph(&noiseGraph)
+		}
 
 		fmt.Println("\nReturn to camera selection")
 	}
@@ -259,6 +276,28 @@ func experimentInfo(exp *experiment.Controller) ui.ExperimentInfo {
 		HasNoise:  last.HasNoise,
 		Level:     last.Mean,
 	}
+}
+
+// toggleGraph opens the real-time noise graph window or closes it.
+// Returns a message for the on-screen notification.
+func toggleGraph(g **graph.Graph) string {
+	if *g != nil {
+		path := (*g).Path()
+		if err := (*g).Close(); err != nil {
+			slog.Error("noise graph close", "err", err)
+		}
+		*g = nil
+		return "Noise graph closed, data: " + path
+	}
+
+	opened, err := graph.Open()
+	if err != nil {
+		slog.Error("noise graph open", "err", err)
+		return "Noise graph error: " + err.Error()
+	}
+	*g = opened
+	fmt.Printf("\nNoise graph logging to %s\n", opened.Path())
+	return "Noise graph opened, logging to " + opened.Path()
 }
 
 // toggleAutoLock locks or restores the camera's automatic exposure, white balance and focus.

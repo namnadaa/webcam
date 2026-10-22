@@ -63,6 +63,9 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	case int('-'), int('_'): // noise threshold down
 		action = actions.ActionThresholdDown
 
+	case int('v'), int('V'): // real-time noise graph window
+		action = actions.ActionToggleGraph
+
 	case int('l'), int('L'): // lock / unlock auto exposure, white balance, focus
 		action = actions.ActionToggleAutoLock
 
