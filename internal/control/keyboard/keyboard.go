@@ -48,8 +48,20 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	case int('c'), int('C'): // controls
 		uiState.ShowControls = !uiState.ShowControls
 
-	case int('b'), int('B'): // noise / dead-pixel test
-		mediaState.NoiseTest = true
+	case int('b'), int('B'): // start / stop noise experiment
+		action = actions.ActionToggleExperiment
+
+	case int('g'), int('G'): // experiment mode
+		action = actions.ActionNextExperimentMode
+
+	case int('h'), int('H'): // experiment duration
+		action = actions.ActionNextExperimentDuration
+
+	case int('='), int('+'): // noise threshold up
+		action = actions.ActionThresholdUp
+
+	case int('-'), int('_'): // noise threshold down
+		action = actions.ActionThresholdDown
 
 	case int('l'), int('L'): // lock / unlock auto exposure, white balance, focus
 		action = actions.ActionToggleAutoLock

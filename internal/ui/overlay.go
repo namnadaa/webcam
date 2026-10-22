@@ -18,6 +18,7 @@ func RenderOverlay(
 	width, height int,
 	cameraName string,
 	frameTime time.Time,
+	experiment ExperimentInfo,
 ) {
 	if state.ShowMenu {
 		DrawMenu(img)
@@ -39,6 +40,8 @@ func RenderOverlay(
 	if state.ShowControls {
 		DrawControls(img)
 	}
+
+	DrawExperiment(img, experiment)
 
 	if time.Now().Before(state.Notification.Until) {
 		DrawNotification(img, state.Notification.Message)

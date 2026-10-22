@@ -4,6 +4,7 @@
 /screenshots/
 /videos/
 /noise_reports/
+/experiments/
 /logs/
 /build/
 *.exe

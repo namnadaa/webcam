@@ -14,6 +14,11 @@ const (
 	ActionNextFPS
 	ActionPrevFPS
 	ActionToggleAutoLock
+	ActionToggleExperiment
+	ActionNextExperimentMode
+	ActionNextExperimentDuration
+	ActionThresholdUp
+	ActionThresholdDown
 )
 
 // HandleAction updates camera config using keyboard actions.

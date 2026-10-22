@@ -76,7 +76,10 @@ func DrawMenu(img *gocv.Mat) {
 		"",
 		"[X] Screenshot",
 		"[R] Video Recording",
-		"[B] Noise / Dead Pixel Test",
+		"[B] Noise Experiment Start/Stop",
+		"[G] Experiment Mode",
+		"[H] Experiment Duration",
+		"[-/=] Noise Threshold",
 		"[L] Lock Auto Exposure/WB/Focus",
 		"",
 		"[TAB] Close Menu",
@@ -159,6 +162,48 @@ func DrawControls(img *gocv.Mat) {
 		drawRightText(img, line, y, color.RGBA{200, 200, 200, 0})
 		y += lineHeight
 	}
+}
+
+// ExperimentInfo is what the experiment panel shows.
+type ExperimentInfo struct {
+	Mode      string
+	Duration  string
+	Threshold float64
+	Running   bool
+	Elapsed   string
+	Noise     float64
+	HasNoise  bool
+	Level     float64
+}
+
+// DrawExperiment renders experiment settings and the live noise level against the threshold
+// in the bottom-left corner, above the notification line.
+func DrawExperiment(img *gocv.Mat, info ExperimentInfo) {
+	x := leftPadding
+	y := img.Rows() - topPadding - 2*lineHeight
+
+	if info.Running {
+		line := fmt.Sprintf("EXP %s  %s / %s  [B] stop", info.Mode, info.Elapsed, info.Duration)
+		drawText(img, line, x, y, color.RGBA{255, 80, 80, 0})
+	} else {
+		line := fmt.Sprintf("Exp: %s [G] | %s [H] | thr %.1f DN [-/=]", info.Mode, info.Duration, info.Threshold)
+		drawText(img, line, x, y, color.RGBA{255, 255, 255, 0})
+	}
+
+	y += lineHeight
+
+	if !info.HasNoise {
+		drawText(img, fmt.Sprintf("Noise -- | Level %.1f", info.Level), x, y, color.RGBA{200, 200, 200, 0})
+		return
+	}
+
+	status, clr := "OK", color.RGBA{0, 255, 0, 0}
+	if info.Noise > info.Threshold {
+		status, clr = "HIGH", color.RGBA{255, 0, 0, 0}
+	}
+
+	line := fmt.Sprintf("Noise %.2f / %.1f DN %s | Level %.1f", info.Noise, info.Threshold, status, info.Level)
+	drawText(img, line, x, y, clr)
 }
 
 // DrawNotification renders notification text on frame.

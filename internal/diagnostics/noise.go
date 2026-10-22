@@ -2,11 +2,7 @@ package diagnostics
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
-	"path/filepath"
 	"time"
-	"webcam/internal/media"
 
 	"gocv.io/x/gocv"
 )
@@ -14,7 +10,7 @@ import (
 // Report holds the result of a per-pixel noise / dead-pixel scan.
 type Report struct {
 	Mean        gocv.Mat // average brightness per pixel (CV64F)
-	StdDev      gocv.Mat // standard deviation per pixel (CV64F)
+	StdDev      gocv.Mat // temporal standard deviation per pixel (CV64F)
 	DeadMask    gocv.Mat // 255 where a pixel never changes (stuck/dead)
 	NoisyMask   gocv.Mat // 255 where a pixel is an outlier by noise level
 	DeadCount   int
@@ -24,17 +20,6 @@ type Report struct {
 	AvgStdDev   float64 // average temporal noise over the frame
 	Frames      int
 	Duration    time.Duration
-}
-
-// Meta describes the capture conditions a noise report was taken under.
-type Meta struct {
-	Camera     string
-	Width      int
-	Height     int
-	FPS        float64
-	Format     string
-	AutoLocked bool
-	Controls   string
 }
 
 // Close releases all Mats held by the report.
@@ -61,7 +46,8 @@ type Collector struct {
 	noisyMultiplier float64 // stddev above (avgStdDev * multiplier) = "noisy" pixel
 }
 
-// NewCollector creates a noise-test collector that accumulates `target` frames.
+// NewCollector creates a collector that accumulates `target` frames.
+// target <= 0 means no limit: the caller decides when to call Finish.
 func NewCollector(target int, deadThreshold, noisyMultiplier float64) *Collector {
 	return &Collector{
 		target:          target,
@@ -94,7 +80,7 @@ func (c *Collector) Start(rows, cols int) {
 	c.active = true
 }
 
-// Add feeds one grayscale (CV8UC1) frame into the accumulator.
+// Add feeds one single-channel frame into the accumulator.
 // Returns true once `target` frames have been collected.
 func (c *Collector) Add(gray gocv.Mat) bool {
 	if !c.active {
@@ -109,11 +95,22 @@ func (c *Collector) Add(gray gocv.Mat) bool {
 	gocv.AccumulateSquare(f64, &c.sumSq)
 
 	c.collected++
-	return c.collected >= c.target
+	return c.target > 0 && c.collected >= c.target
+}
+
+// Discard stops a scan without computing a report and releases accumulator resources.
+func (c *Collector) Discard() {
+	if !c.active {
+		return
+	}
+	c.sum.Close()
+	c.sumSq.Close()
+	c.active = false
+	c.collected = 0
 }
 
 // Finish computes the final report and releases accumulator resources.
-// Must only be called after Add has returned true.
+// At least one frame must have been added.
 func (c *Collector) Finish() Report {
 	defer func() {
 		c.sum.Close()
@@ -171,14 +168,8 @@ func (c *Collector) Finish() Report {
 	}
 }
 
-// SaveReport renders a visualization (dead pixels in blue, noisy pixels in red,
-// overlaid on the average frame) and saves it to disk.
-func SaveReport(r Report, meta Meta) error {
-	if err := os.MkdirAll("noise_reports", 0755); err != nil {
-		slog.Error("noise_reports dir error", "err", err)
-		return err
-	}
-
+// SaveDefectMap renders dead pixels in blue and noisy pixels in red over the average frame.
+func SaveDefectMap(r Report, path string) error {
 	meanU8 := gocv.NewMat()
 	defer meanU8.Close()
 	r.Mean.ConvertTo(&meanU8, gocv.MatTypeCV8U)
@@ -195,132 +186,41 @@ func SaveReport(r Report, meta Meta) error {
 	defer blue.Close()
 	blue.CopyToWithMask(&visual, r.DeadMask)
 
-	now := time.Now()
-	stamp := now.Format("2006-01-02_15-04-05")
-	path := filepath.Join("noise_reports", fmt.Sprintf("noise_report_%s.png", stamp))
-
 	if !gocv.IMWrite(path, visual) {
-		return fmt.Errorf("failed to save noise report")
+		return fmt.Errorf("failed to save defect map %s", path)
 	}
-
-	deadPct := float64(r.DeadCount) / float64(r.TotalPixels) * 100
-	noisyPct := float64(r.NoisyCount) / float64(r.TotalPixels) * 100
-
-	report := fmt.Sprintf(
-		"Noise test report - %s\n"+
-			"Camera: %s\n"+
-			"Resolution: %dx%d (%d pixels total)\n"+
-			"FPS (driver): %.2f\n"+
-			"Format: %s\n"+
-			"Source: raw camera frame, grayscale (filters bypassed)\n"+
-			"Auto controls locked: %s\n"+
-			"Controls: %s\n"+
-			"Frames: %d over %s\n"+
-			"\n"+
-			"Mean brightness:    %.3f\n"+
-			"Avg temporal noise: %.4f (stddev, DN)\n"+
-			"Dead/stuck pixels:  %d (%.4f%%)\n"+
-			"Noisy pixels:       %d (%.4f%%)\n",
-		now.Format("2006-01-02 15:04:05"),
-		meta.Camera,
-		r.Mean.Cols(), r.Mean.Rows(), r.TotalPixels,
-		meta.FPS,
-		meta.Format,
-		yesNo(meta.AutoLocked),
-		meta.Controls,
-		r.Frames, r.Duration.Round(time.Millisecond),
-		r.MeanLevel,
-		r.AvgStdDev,
-		r.DeadCount, deadPct,
-		r.NoisyCount, noisyPct,
-	)
-
-	txtPath := filepath.Join("noise_reports", fmt.Sprintf("noise_report_%s.txt", stamp))
-	if err := os.WriteFile(txtPath, []byte(report), 0644); err != nil {
-		slog.Error("noise report txt save error", "err", err)
-	}
-
-	slog.Info("noise test complete",
-		"dead_pixels", r.DeadCount,
-		"noisy_pixels", r.NoisyCount,
-		"total_pixels", r.TotalPixels,
-		"avg_stddev", r.AvgStdDev,
-		"auto_locked", meta.AutoLocked,
-		"file", path,
-	)
-
 	return nil
 }
 
-// yesNo converts a boolean into "yes"/"no" for reports.
-func yesNo(v bool) string {
-	if v {
-		return "yes"
+// SaveMeanMap saves the average frame as an 8-bit grayscale image.
+func SaveMeanMap(r Report, path string) error {
+	meanU8 := gocv.NewMat()
+	defer meanU8.Close()
+	r.Mean.ConvertTo(&meanU8, gocv.MatTypeCV8U)
+
+	if !gocv.IMWrite(path, meanU8) {
+		return fmt.Errorf("failed to save mean map %s", path)
 	}
-	return "no"
+	return nil
 }
 
-// Event represents noise-test lifecycle events.
-type Event int
-
-const (
-	EventNone Event = iota
-	EventStarted
-	EventProgress
-	EventDone
-)
-
-// Result describes the outcome of one UpdateNoiseTest call.
-type Result struct {
-	Event      Event
-	Message    string
-	DeadCount  int
-	NoisyCount int
-}
-
-// UpdateNoiseTest drives the noise-test lifecycle: starts a scan when requested,
-// feeds the current frame into the collector, and finalizes + saves the report
-// once enough frames have been collected.
-// frame must be the raw camera frame, not the filtered one.
-func UpdateNoiseTest(c *Collector, state *media.State, frame gocv.Mat, meta Meta) Result {
-	if state.NoiseTest && !c.Active() {
-		c.Start(frame.Rows(), frame.Cols())
-		state.NoiseTest = false
-
-		msg := "Noise test started: keep camera still"
-		if !meta.AutoLocked {
-			msg += " (auto controls not locked, press L)"
-		}
-		return Result{Event: EventStarted, Message: msg}
+// SaveNoiseMap saves the per-pixel temporal noise as a false-color heat map.
+// Values from 0 to maxStdDev are mapped onto the full color range; brighter means noisier.
+func SaveNoiseMap(r Report, path string, maxStdDev float64) error {
+	if maxStdDev <= 0 {
+		maxStdDev = 1
 	}
 
-	if !c.Active() {
-		return Result{Event: EventNone}
+	scaled := gocv.NewMat()
+	defer scaled.Close()
+	r.StdDev.ConvertToWithParams(&scaled, gocv.MatTypeCV8U, float32(255/maxStdDev), 0)
+
+	heat := gocv.NewMat()
+	defer heat.Close()
+	gocv.ApplyColorMap(scaled, &heat, gocv.ColormapHot)
+
+	if !gocv.IMWrite(path, heat) {
+		return fmt.Errorf("failed to save noise map %s", path)
 	}
-
-	gray := gocv.NewMat()
-	defer gray.Close()
-	_ = gocv.CvtColor(frame, &gray, gocv.ColorBGRToGray)
-
-	if c.Add(gray) {
-		report := c.Finish()
-		defer report.Close()
-
-		if err := SaveReport(report, meta); err != nil {
-			slog.Error("noise report save error", "err", err)
-		}
-
-		return Result{
-			Event:      EventDone,
-			Message:    fmt.Sprintf("Noise test done: noise=%.3f dead=%d noisy=%d", report.AvgStdDev, report.DeadCount, report.NoisyCount),
-			DeadCount:  report.DeadCount,
-			NoisyCount: report.NoisyCount,
-		}
-	}
-
-	collected, target := c.Progress()
-	return Result{
-		Event:   EventProgress,
-		Message: fmt.Sprintf("Analyzing noise... %d/%d", collected, target),
-	}
+	return nil
 }

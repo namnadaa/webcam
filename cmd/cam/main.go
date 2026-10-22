@@ -11,7 +11,7 @@ import (
 	"webcam/internal/camera"
 	"webcam/internal/control"
 	"webcam/internal/control/keyboard"
-	"webcam/internal/diagnostics"
+	"webcam/internal/experiment"
 	"webcam/internal/helpers"
 	"webcam/internal/logger"
 	"webcam/internal/media"
@@ -77,6 +77,9 @@ func main() {
 		autoLocked := false
 		var savedControls camera.Controls
 
+		exp := experiment.NewController()
+		fmt.Printf("\nNoise threshold: %.1f DN (change with -/= in the camera window)\n", exp.Config.Threshold)
+
 		for {
 			cam, err := camera.Open(cfg)
 			if err != nil {
@@ -93,6 +96,8 @@ func main() {
 			if autoLocked {
 				cam.LockAuto()
 			}
+
+			exp.ResetMeter()
 
 			slog.Info(
 				"camera settings applied",
@@ -117,7 +122,6 @@ func main() {
 			)
 
 			recorder := &media.VideoRecorder{}
-			noiseCollector := diagnostics.NewCollector(60, 1.0, 3.0) // 60 кадров, порог "мёртвого" = 1.0, "шумный" = среднее*3
 
 			runCamera := true
 			for runCamera {
@@ -140,9 +144,28 @@ func main() {
 							return
 						}
 
-						if action == actions.ActionToggleAutoLock {
-							msg := toggleAutoLock(cam, &autoLocked, &savedControls)
-							uiState.ShowNotification(msg, 3*time.Second)
+						switch action {
+						case actions.ActionToggleAutoLock:
+							uiState.ShowNotification(toggleAutoLock(cam, &autoLocked, &savedControls), 3*time.Second)
+						case actions.ActionNextExperimentMode:
+							uiState.ShowNotification(exp.NextMode(), 3*time.Second)
+						case actions.ActionNextExperimentDuration:
+							uiState.ShowNotification(exp.NextDuration(), 2*time.Second)
+						case actions.ActionThresholdUp:
+							uiState.ShowNotification(exp.AdjustThreshold(experiment.ThresholdStep), 2*time.Second)
+						case actions.ActionThresholdDown:
+							uiState.ShowNotification(exp.AdjustThreshold(-experiment.ThresholdStep), 2*time.Second)
+						case actions.ActionToggleExperiment:
+							meta := experiment.Meta{
+								Camera:     selected.Name,
+								Width:      f.Raw.Cols(),
+								Height:     f.Raw.Rows(),
+								FPS:        actualFPS,
+								Format:     format,
+								AutoLocked: autoLocked,
+								Controls:   cam.ReadControls().String(),
+							}
+							uiState.ShowNotification(exp.Toggle(meta), 5*time.Second)
 						}
 
 						cameraChanged := actions.HandleAction(action, modes, &cfg, &resolutionIndex, &fpsIndex)
@@ -168,25 +191,8 @@ func main() {
 							uiState.ShowNotification("Screenshot saved", 2*time.Second)
 						}
 
-						noiseMeta := diagnostics.Meta{
-							Camera:     selected.Name,
-							Width:      actualW,
-							Height:     actualH,
-							FPS:        actualFPS,
-							Format:     format,
-							AutoLocked: autoLocked,
-						}
-						if noiseCollector.Active() || mediaState.NoiseTest {
-							noiseMeta.Controls = cam.ReadControls().String()
-						}
-
-						noiseResult := diagnostics.UpdateNoiseTest(noiseCollector, &mediaState, f.Raw, noiseMeta)
-
-						switch noiseResult.Event {
-						case diagnostics.EventStarted, diagnostics.EventDone:
-							uiState.ShowNotification(noiseResult.Message, 4*time.Second)
-						case diagnostics.EventProgress:
-							uiState.ShowNotification(noiseResult.Message, 300*time.Millisecond)
+						if msg := exp.Update(f.Raw, f.Time); msg != "" {
+							uiState.ShowNotification(msg, 8*time.Second)
 						}
 
 						ui.RenderOverlay(
@@ -199,6 +205,7 @@ func main() {
 							actualH,
 							selected.Name,
 							f.Time,
+							experimentInfo(exp),
 						)
 
 						recorder.Write(f.Img)
@@ -218,6 +225,10 @@ func main() {
 				}
 			}
 
+			if exp.Running() {
+				exp.Stop()
+			}
+
 			_ = cam.Close()
 			_ = win.Close()
 
@@ -229,7 +240,24 @@ func main() {
 			break
 		}
 
+		exp.Close()
+
 		fmt.Println("\nReturn to camera selection")
+	}
+}
+
+// experimentInfo collects what the on-screen experiment panel shows.
+func experimentInfo(exp *experiment.Controller) ui.ExperimentInfo {
+	last := exp.Last()
+	return ui.ExperimentInfo{
+		Mode:      exp.Config.Mode.String(),
+		Duration:  experiment.FormatDuration(exp.Config.Duration()),
+		Threshold: exp.Config.Threshold,
+		Running:   exp.Running(),
+		Elapsed:   experiment.FormatClock(exp.Elapsed()),
+		Noise:     last.Noise,
+		HasNoise:  last.HasNoise,
+		Level:     last.Mean,
 	}
 }
 
