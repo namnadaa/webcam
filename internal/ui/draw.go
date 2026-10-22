@@ -103,11 +103,12 @@ func DrawMenu(img *gocv.Mat) {
 }
 
 // DrawStats renders performance statistics.
-func DrawStats(img *gocv.Mat, fps float64, latency int64, width int, height int, cameraName string) {
+func DrawStats(img *gocv.Mat, fps float64, latency int64, width int, height int, format string, cameraName string) {
 	stats := []string{
 		fmt.Sprintf("FPS: %.2f", fps),
 		fmt.Sprintf("Latency: %d ms", latency),
 		fmt.Sprintf("Resolution: %dx%d", width, height),
+		fmt.Sprintf("Format: %s", format),
 		fmt.Sprintf("Camera: %s", cameraName),
 	}
 

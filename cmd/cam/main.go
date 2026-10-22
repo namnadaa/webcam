@@ -55,7 +55,7 @@ func main() {
 		}
 		camera.PrintModes(modes)
 
-		width, height, fps, changed := camera.AskCameraSettings(modes)
+		settings, changed := camera.AskCameraSettings(modes)
 		steps := matrixSteps(camera.AskMatrix(modes))
 
 		cfg := camera.Config{
@@ -67,9 +67,10 @@ func main() {
 		}
 
 		if changed {
-			cfg.Width = width
-			cfg.Height = height
-			cfg.FPS = fps
+			cfg.Width = settings.Width
+			cfg.Height = settings.Height
+			cfg.FPS = settings.FPS
+			cfg.Format = settings.Format
 		}
 
 		resolutionIndex, fpsIndex := camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS)
@@ -97,7 +98,11 @@ func main() {
 
 			actualW, actualH := cam.ActualSize()
 			actualFPS := cam.ActualFPS()
-			format := camera.FourCCToString(cam.PixelFormat())
+			format := cam.Format()
+			if cfg.Format != "" && format != cfg.Format {
+				fmt.Printf("\nWarning: requested format %s, camera uses %s\n", cfg.Format, format)
+				slog.Warn("pixel format not applied", "requested", cfg.Format, "actual", format)
+			}
 
 			if autoLocked {
 				cam.LockAuto()
@@ -112,6 +117,7 @@ func main() {
 				"height", actualH,
 				"fps", actualFPS,
 				"format", format,
+				"requested_format", cfg.Format,
 				"controls", cam.ReadControls().String(),
 			)
 
@@ -192,7 +198,7 @@ func main() {
 						case actions.ActionThresholdDown:
 							uiState.ShowNotification(exp.AdjustThreshold(-experiment.ThresholdStep), 2*time.Second)
 						case actions.ActionToggleExperiment:
-							meta := experimentMeta(cam, f, selected.Name, actualFPS, format, autoLocked)
+							meta := experimentMeta(cam, f, selected.Name, actualFPS, format, cfg.Format, autoLocked)
 							uiState.ShowNotification(exp.Toggle(meta), 5*time.Second)
 						case actions.ActionToggleGraph:
 							uiState.ShowNotification(toggleGraph(&noiseGraph), 3*time.Second)
@@ -245,7 +251,7 @@ func main() {
 						}
 
 						if matrix != nil && !exp.Running() && time.Since(openedAt) >= experiment.Warmup {
-							meta := experimentMeta(cam, f, selected.Name, actualFPS, format, autoLocked)
+							meta := experimentMeta(cam, f, selected.Name, actualFPS, format, cfg.Format, autoLocked)
 							fmt.Printf("\nMode matrix %s: %s\n", matrix.Progress(), matrix.Current())
 							uiState.ShowNotification(exp.Toggle(meta), 3*time.Second)
 						}
@@ -268,6 +274,7 @@ func main() {
 							fpsCam,
 							actualW,
 							actualH,
+							format,
 							selected.Name,
 							f.Time,
 							experimentInfo(exp, matrix),
@@ -318,13 +325,14 @@ func main() {
 }
 
 // experimentMeta describes the current capture conditions for an experiment report.
-func experimentMeta(cam *camera.Camera, f pipeline.Frame, cameraName string, fps float64, format string, autoLocked bool) experiment.Meta {
+func experimentMeta(cam *camera.Camera, f pipeline.Frame, cameraName string, fps float64, format, requested string, autoLocked bool) experiment.Meta {
 	return experiment.Meta{
 		Camera:     cameraName,
 		Width:      f.Raw.Cols(),
 		Height:     f.Raw.Rows(),
 		FPS:        fps,
 		Format:     format,
+		Requested:  requested,
 		AutoLocked: autoLocked,
 		Controls:   cam.ReadControls().String(),
 	}

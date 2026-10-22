@@ -25,7 +25,7 @@ func metaText(cfg Config, meta Meta, started time.Time) string {
 	fmt.Fprintf(&b, "Camera:           %s\n", meta.Camera)
 	fmt.Fprintf(&b, "Resolution:       %dx%d\n", meta.Width, meta.Height)
 	fmt.Fprintf(&b, "FPS (driver):     %.2f\n", meta.FPS)
-	fmt.Fprintf(&b, "Format:           %s\n", meta.Format)
+	fmt.Fprintf(&b, "Format:           %s (requested: %s)\n", meta.Format, requestedText(meta.Requested))
 	fmt.Fprintf(&b, "Source:           raw camera frame, grayscale (filters bypassed)\n")
 	fmt.Fprintf(&b, "Auto controls:    %s\n", lockedText(meta.AutoLocked))
 	fmt.Fprintf(&b, "Controls:         %s\n", meta.Controls)
@@ -220,6 +220,14 @@ func nonUniformityName(m Mode, state string, f Field) string {
 		return "PRNU"
 	}
 	return "includes scene content"
+}
+
+// requestedText shows an empty requested format as the driver default.
+func requestedText(format string) string {
+	if format == "" {
+		return "auto"
+	}
+	return format
 }
 
 // lockedText describes whether auto exposure/white balance/focus were locked.

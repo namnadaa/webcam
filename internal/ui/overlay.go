@@ -16,6 +16,7 @@ func RenderOverlay(
 	stages []pipeline.StageToggle,
 	fps float64,
 	width, height int,
+	format string,
 	cameraName string,
 	frameTime time.Time,
 	experiment ExperimentInfo,
@@ -26,7 +27,7 @@ func RenderOverlay(
 
 	if state.ShowStats {
 		latency := time.Since(frameTime).Milliseconds()
-		DrawStats(img, fps, latency, width, height, cameraName)
+		DrawStats(img, fps, latency, width, height, format, cameraName)
 	}
 
 	if state.ShowSettings {

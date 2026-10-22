@@ -29,7 +29,8 @@ type Meta struct {
 	Width      int
 	Height     int
 	FPS        float64 // reported by the driver
-	Format     string
+	Format     string  // pixel format the camera actually uses
+	Requested  string  // pixel format asked for, "" = driver default
 	AutoLocked bool
 	Controls   string
 }
@@ -98,7 +99,7 @@ type Session struct {
 // Start creates the experiment folder, writes meta.txt and opens data.csv.
 func Start(cfg Config, meta Meta, rows, cols int) (*Session, error) {
 	now := time.Now()
-	name := fmt.Sprintf("%s_%s_%dx%d@%g", now.Format("2006-01-02_15-04-05"), cfg.Mode, meta.Width, meta.Height, meta.FPS)
+	name := fmt.Sprintf("%s_%s_%dx%d@%g_%s", now.Format("2006-01-02_15-04-05"), cfg.Mode, meta.Width, meta.Height, meta.FPS, meta.Format)
 	dir := filepath.Join(RootDir, name)
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -281,6 +282,7 @@ type Summary struct {
 	Height    int
 	FPS       float64 // reported by the driver
 	EffFPS    float64 // actually received
+	Format    string
 	Frames    int
 	Elapsed   time.Duration
 	Threshold float64
@@ -370,6 +372,7 @@ func (s *Session) summary(elapsed time.Duration) Summary {
 		Height:    s.meta.Height,
 		FPS:       s.meta.FPS,
 		EffFPS:    s.effectiveFPS(),
+		Format:    s.meta.Format,
 		Frames:    s.frames,
 		Elapsed:   elapsed,
 		Threshold: s.cfg.Threshold,

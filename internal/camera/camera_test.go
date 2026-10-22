@@ -212,3 +212,14 @@ func TestCamera_Properties(t *testing.T) {
 		t.Run(tt.name, tt.test)
 	}
 }
+
+func TestFourCCRoundTrip(t *testing.T) {
+	for _, name := range []string{"MJPG", "YUY2", "NV12"} {
+		if got := camera.FourCCToString(camera.FourCC(name)); got != name {
+			t.Errorf("FourCCToString(FourCC(%q)) = %q", name, got)
+		}
+	}
+	if camera.FourCC("MJPG") != 0x47504A4D {
+		t.Errorf("FourCC(MJPG) = %#x, want 0x47504A4D", camera.FourCC("MJPG"))
+	}
+}

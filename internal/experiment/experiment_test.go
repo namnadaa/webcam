@@ -137,6 +137,10 @@ func TestSessionWritesResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if !strings.HasSuffix(summary.Dir, "_dark_16x4@30_MJPG") || summary.Format != "MJPG" {
+		t.Errorf("dir %q / format %q do not carry the pixel format", summary.Dir, summary.Format)
+	}
+
 	if summary.Frames != 4 || summary.AvgNoise != 0 || summary.Drift != 2 {
 		t.Errorf("summary = %+v", summary)
 	}
@@ -159,7 +163,7 @@ func TestSessionWritesResults(t *testing.T) {
 	}
 
 	report, _ := os.ReadFile(filepath.Join(summary.Dir, "report.txt"))
-	for _, want := range []string{"stopped by user", "Pixel noise:      avg 1.0000", "NOT locked", "Zones 8x6", "effective 30.30 FPS"} {
+	for _, want := range []string{"stopped by user", "Pixel noise:      avg 1.0000", "NOT locked", "Zones 8x6", "effective 30.30 FPS", "Format:           MJPG (requested: auto)"} {
 		if !strings.Contains(string(report), want) {
 			t.Errorf("report.txt does not contain %q", want)
 		}

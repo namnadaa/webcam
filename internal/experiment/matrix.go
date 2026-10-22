@@ -98,14 +98,14 @@ func (m *Matrix) csv() string {
 	var b strings.Builder
 
 	b.WriteString(helpers.CSVBOM)
-	b.WriteString(helpers.CSVRow("requested", "width", "height", "fps_driver", "fps_effective", "frames", "level",
+	b.WriteString(helpers.CSVRow("requested", "width", "height", "format", "fps_driver", "fps_effective", "frames", "level",
 		"temporal_noise", "above_threshold_pct", "pixel_noise", "non_uniformity", "row_fpn", "col_fpn", "drift",
 		"off_level", "off_noise", "signal", "snr", "switches", "period_s", "dir"))
 
 	f := helpers.CSVFloat
 	for i, r := range m.results {
 		b.WriteString(helpers.CSVRow(
-			m.steps[i].String(), strconv.Itoa(r.Width), strconv.Itoa(r.Height),
+			m.steps[i].String(), strconv.Itoa(r.Width), strconv.Itoa(r.Height), r.Format,
 			f(r.FPS, 2), f(r.EffFPS, 2), strconv.Itoa(r.Frames), f(r.Level, 4), f(r.AvgNoise, 4), f(r.AbovePct, 2),
 			f(r.PixelNoise, 4), f(r.NonUniformity, 4), f(r.RowFPN, 4), f(r.ColFPN, 4), f(r.Drift, 4),
 			f(r.OffLevel, 4), f(r.OffNoise, 4), f(r.Signal, 4), f(r.SNR, 2), strconv.Itoa(r.Switches), f(r.Period, 3),
@@ -131,16 +131,16 @@ func (m *Matrix) text(aborted bool) string {
 	fmt.Fprintf(&b, "Modes:            %d of %d measured (%s)\n", len(m.results), len(m.steps), status)
 	fmt.Fprintf(&b, "Warmup per mode:  %s\n\n", FormatDuration(Warmup))
 
-	fmt.Fprintf(&b, "%-16s %-11s %7s %7s %8s %8s %8s %8s %8s %8s %8s",
-		"requested", "actual", "fps", "eff.fps", "level", "t.noise", "px.noise", "nonunif", "row.fpn", "col.fpn", "drift")
+	fmt.Fprintf(&b, "%-16s %-11s %-7s %7s %7s %8s %8s %8s %8s %8s %8s %8s",
+		"requested", "actual", "format", "fps", "eff.fps", "level", "t.noise", "px.noise", "nonunif", "row.fpn", "col.fpn", "drift")
 	if m.cfg.Mode == ModeModulator {
 		fmt.Fprintf(&b, " %8s %8s %7s", "signal", "off.nse", "SNR")
 	}
 	b.WriteString("\n")
 
 	for i, r := range m.results {
-		fmt.Fprintf(&b, "%-16s %-11s %7.2f %7.2f %8.3f %8.4f %8.4f %8.4f %8.4f %8.4f %+8.3f",
-			m.steps[i], fmt.Sprintf("%dx%d", r.Width, r.Height), r.FPS, r.EffFPS, r.Level, r.AvgNoise,
+		fmt.Fprintf(&b, "%-16s %-11s %-7s %7.2f %7.2f %8.3f %8.4f %8.4f %8.4f %8.4f %8.4f %+8.3f",
+			m.steps[i], fmt.Sprintf("%dx%d", r.Width, r.Height), r.Format, r.FPS, r.EffFPS, r.Level, r.AvgNoise,
 			r.PixelNoise, r.NonUniformity, r.RowFPN, r.ColFPN, r.Drift)
 		if m.cfg.Mode == ModeModulator {
 			fmt.Fprintf(&b, " %8.3f %8.4f %7.2f", r.Signal, r.OffNoise, r.SNR)

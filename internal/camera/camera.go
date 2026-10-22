@@ -26,9 +26,14 @@ type Config struct {
 	Width  int
 	Height int
 	FPS    float64
-	Format string
+	Format string // FourCC pixel format, e.g. "MJPG"; "" lets the driver choose
 	Name   string
 }
+
+// Formats lists the pixel formats offered for selection.
+// MJPG is compressed (more frames per second, adds compression artifacts),
+// YUY2 and NV12 are uncompressed.
+var Formats = []string{"MJPG", "YUY2", "NV12"}
 
 // Camera represents an active video capture device.
 type Camera struct {
@@ -53,6 +58,11 @@ func Open(cfg Config) (*Camera, error) {
 	if cap == nil || !cap.IsOpened() {
 		cap.Close()
 		return nil, fmt.Errorf("no available camera found (API=%v)", cfg.API)
+	}
+
+	// the format must be set before the size: drivers pick the size from the formats they offer
+	if cfg.Format != "" {
+		cap.Set(gocv.VideoCaptureFOURCC, float64(FourCC(cfg.Format)))
 	}
 
 	if cfg.Width > 0 {
@@ -116,6 +126,20 @@ func (c *Camera) ActualFPS() float64 {
 // PixelFormat returns the FOURCC pixel format of the camera stream.
 func (c *Camera) PixelFormat() int {
 	return int(c.cap.Get(gocv.VideoCaptureFOURCC))
+}
+
+// Format returns the applied pixel format as text, or "unknown" when the backend does not report it.
+func (c *Camera) Format() string {
+	if f := FourCCToString(c.PixelFormat()); f != "" {
+		return f
+	}
+	return "unknown"
+}
+
+// FourCC converts a four-letter format name into its integer code; shorter names are padded with spaces.
+func FourCC(name string) int {
+	b := []byte(name + "    ")[:4]
+	return int(b[0]) | int(b[1])<<8 | int(b[2])<<16 | int(b[3])<<24
 }
 
 // FourCCToString converts a FOURCC integer code into a human-readable string.
@@ -186,8 +210,17 @@ func FindCameras() []Config {
 	return cameras
 }
 
-// AskCameraSettings optionally prompts the user to pick one of the supported modes (printed by PrintModes) and returns its values.
-func AskCameraSettings(modes []Mode) (int, int, float64, bool) {
+// Settings are the camera parameters the user picked in the console.
+type Settings struct {
+	Width  int
+	Height int
+	FPS    float64
+	Format string // "" = driver default
+}
+
+// AskCameraSettings optionally prompts the user to pick one of the supported modes (printed by PrintModes)
+// and a pixel format. Returns false when the user keeps the camera defaults.
+func AskCameraSettings(modes []Mode) (Settings, bool) {
 	var choice string
 
 	for {
@@ -201,7 +234,7 @@ func AskCameraSettings(modes []Mode) (int, int, float64, bool) {
 	}
 
 	if choice != "y" || len(modes) == 0 {
-		return 0, 0, 0, false
+		return Settings{}, false
 	}
 
 	m := modes[askNumber("Select resolution", len(modes))-1]
@@ -215,7 +248,21 @@ func AskCameraSettings(modes []Mode) (int, int, float64, bool) {
 		fps = m.FPS[askNumber("Select FPS", len(m.FPS))-1]
 	}
 
-	return m.Width, m.Height, fps, true
+	return Settings{Width: m.Width, Height: m.Height, FPS: fps, Format: askFormat()}, true
+}
+
+// askFormat lets the user pick a pixel format or keep the driver default.
+func askFormat() string {
+	fmt.Println("\n[1] auto (driver default)")
+	for i, f := range Formats {
+		fmt.Printf("[%d] %s\n", i+2, f)
+	}
+
+	n := askNumber("Select format", len(Formats)+1)
+	if n == 1 {
+		return ""
+	}
+	return Formats[n-2]
 }
 
 // askNumber reads a number in range [1, max] from stdin, repeating until the input is valid.
