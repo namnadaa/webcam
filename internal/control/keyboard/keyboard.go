@@ -51,6 +51,9 @@ func HandleKeyboard(win *gocv.Window, params *control.PipelineParams, stages []p
 	case int('b'), int('B'): // noise / dead-pixel test
 		mediaState.NoiseTest = true
 
+	case int('l'), int('L'): // lock / unlock auto exposure, white balance, focus
+		action = actions.ActionToggleAutoLock
+
 	case int('x'), int('X'): // screenshot
 		mediaState.Screenshot = true
 

@@ -13,57 +13,56 @@ const (
 	ActionPrevResolution
 	ActionNextFPS
 	ActionPrevFPS
+	ActionToggleAutoLock
 )
 
 // HandleAction updates camera config using keyboard actions.
-func HandleAction(action CameraAction, cfg *camera.Config, resolutionIndex *int, fpsIndex *int) bool {
+// Resolutions and frame rates are cycled through the given supported modes.
+func HandleAction(action CameraAction, modes []camera.Mode, cfg *camera.Config, resolutionIndex *int, fpsIndex *int) bool {
+	if len(modes) == 0 {
+		return false
+	}
+
 	cameraChanged := false
 
 	switch action {
 	case ActionNextResolution:
-		*(resolutionIndex)++
-
-		if *resolutionIndex >= len(camera.Resolutions) {
-			*resolutionIndex = 0
-		}
-
+		*resolutionIndex = wrap(*resolutionIndex+1, len(modes))
+		*fpsIndex = camera.ClosestFPS(modes[*resolutionIndex].FPS, cfg.FPS)
 		cameraChanged = true
 
 	case ActionPrevResolution:
-		*(resolutionIndex)--
-
-		if *resolutionIndex < 0 {
-			*resolutionIndex = len(camera.Resolutions) - 1
-		}
-
+		*resolutionIndex = wrap(*resolutionIndex-1, len(modes))
+		*fpsIndex = camera.ClosestFPS(modes[*resolutionIndex].FPS, cfg.FPS)
 		cameraChanged = true
 
 	case ActionNextFPS:
-		*(fpsIndex)++
-
-		if *fpsIndex >= len(camera.FPSPresets) {
-			*fpsIndex = 0
+		if n := len(modes[*resolutionIndex].FPS); n > 0 {
+			*fpsIndex = wrap(*fpsIndex+1, n)
+			cameraChanged = true
 		}
-
-		cameraChanged = true
 
 	case ActionPrevFPS:
-		*(fpsIndex)--
-
-		if *fpsIndex < 0 {
-			*fpsIndex = len(camera.FPSPresets) - 1
+		if n := len(modes[*resolutionIndex].FPS); n > 0 {
+			*fpsIndex = wrap(*fpsIndex-1, n)
+			cameraChanged = true
 		}
-
-		cameraChanged = true
 	}
 
 	if cameraChanged {
-		resolution := camera.Resolutions[*resolutionIndex]
+		mode := modes[*resolutionIndex]
 
-		cfg.Width = resolution.Width
-		cfg.Height = resolution.Height
-		cfg.FPS = camera.FPSPresets[*fpsIndex]
+		cfg.Width = mode.Width
+		cfg.Height = mode.Height
+		if len(mode.FPS) > 0 {
+			cfg.FPS = mode.FPS[*fpsIndex]
+		}
 	}
 
 	return cameraChanged
+}
+
+// wrap keeps an index inside [0, n) cycling at both ends.
+func wrap(i, n int) int {
+	return ((i % n) + n) % n
 }

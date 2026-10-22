@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"gocv.io/x/gocv"
@@ -185,8 +186,8 @@ func FindCameras() []Config {
 	return cameras
 }
 
-// AskCameraSettings optionally prompts the user to override camera parameters and returns updated values.
-func AskCameraSettings() (int, int, float64, bool) {
+// AskCameraSettings optionally prompts the user to pick one of the supported modes (printed by PrintModes) and returns its values.
+func AskCameraSettings(modes []Mode) (int, int, float64, bool) {
 	var choice string
 
 	for {
@@ -199,21 +200,36 @@ func AskCameraSettings() (int, int, float64, bool) {
 		fmt.Println("Please enter 'y' or 'n'")
 	}
 
-	if choice != "y" {
+	if choice != "y" || len(modes) == 0 {
 		return 0, 0, 0, false
 	}
 
-	var width, height int
-	var fps float64
+	m := modes[askNumber("Select resolution", len(modes))-1]
 
-	fmt.Print("Enter width: ")
-	fmt.Scan(&width)
+	fps := 0.0
+	if len(m.FPS) > 0 {
+		fmt.Println()
+		for i, v := range m.FPS {
+			fmt.Printf("[%d] %g FPS\n", i+1, v)
+		}
+		fps = m.FPS[askNumber("Select FPS", len(m.FPS))-1]
+	}
 
-	fmt.Print("Enter height: ")
-	fmt.Scan(&height)
+	return m.Width, m.Height, fps, true
+}
 
-	fmt.Print("Enter FPS: ")
-	fmt.Scan(&fps)
+// askNumber reads a number in range [1, max] from stdin, repeating until the input is valid.
+func askNumber(prompt string, max int) int {
+	var input string
 
-	return width, height, fps, true
+	for {
+		fmt.Printf("%s [1-%d]: ", prompt, max)
+		fmt.Scan(&input)
+
+		n, err := strconv.Atoi(strings.TrimSpace(input))
+		if err == nil && n >= 1 && n <= max {
+			return n
+		}
+		fmt.Printf("Please enter a number from 1 to %d\n", max)
+	}
 }

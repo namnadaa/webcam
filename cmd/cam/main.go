@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"webcam/internal/actions"
@@ -45,7 +46,15 @@ func main() {
 			return
 		}
 
-		width, height, fps, changed := camera.AskCameraSettings()
+		fmt.Println("\nProbing supported modes...")
+		modes, err := camera.ProbeModes(selected.Index, camera.APIAny)
+		if err != nil || len(modes) == 0 {
+			slog.Warn("could not probe camera modes, using presets", "err", err)
+			modes = camera.PresetModes()
+		}
+		camera.PrintModes(modes)
+
+		width, height, fps, changed := camera.AskCameraSettings(modes)
 
 		cfg := camera.Config{
 			Index:  selected.Index,
@@ -55,19 +64,20 @@ func main() {
 			FPS:    selected.FPS,
 		}
 
-		resolutionIndex := 0
-		fpsIndex := 0
+		if changed {
+			cfg.Width = width
+			cfg.Height = height
+			cfg.FPS = fps
+		}
+
+		resolutionIndex, fpsIndex := camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS)
 
 		restartCamera := false
 
+		autoLocked := false
+		var savedControls camera.Controls
+
 		for {
-
-			if changed {
-				cfg.Width = width
-				cfg.Height = height
-				cfg.FPS = fps
-			}
-
 			cam, err := camera.Open(cfg)
 			if err != nil {
 				slog.Error("camera not opened", "err", err)
@@ -78,12 +88,19 @@ func main() {
 
 			actualW, actualH := cam.ActualSize()
 			actualFPS := cam.ActualFPS()
+			format := camera.FourCCToString(cam.PixelFormat())
+
+			if autoLocked {
+				cam.LockAuto()
+			}
 
 			slog.Info(
 				"camera settings applied",
 				"width", actualW,
 				"height", actualH,
 				"fps", actualFPS,
+				"format", format,
+				"controls", cam.ReadControls().String(),
 			)
 
 			stages := pipeline.NewStages()
@@ -123,7 +140,12 @@ func main() {
 							return
 						}
 
-						cameraChanged := actions.HandleAction(action, &cfg, &resolutionIndex, &fpsIndex)
+						if action == actions.ActionToggleAutoLock {
+							msg := toggleAutoLock(cam, &autoLocked, &savedControls)
+							uiState.ShowNotification(msg, 3*time.Second)
+						}
+
+						cameraChanged := actions.HandleAction(action, modes, &cfg, &resolutionIndex, &fpsIndex)
 						if cameraChanged {
 							safeClose(done)
 							wg.Wait()
@@ -146,7 +168,19 @@ func main() {
 							uiState.ShowNotification("Screenshot saved", 2*time.Second)
 						}
 
-						noiseResult := diagnostics.UpdateNoiseTest(noiseCollector, &mediaState, f.Img)
+						noiseMeta := diagnostics.Meta{
+							Camera:     selected.Name,
+							Width:      actualW,
+							Height:     actualH,
+							FPS:        actualFPS,
+							Format:     format,
+							AutoLocked: autoLocked,
+						}
+						if noiseCollector.Active() || mediaState.NoiseTest {
+							noiseMeta.Controls = cam.ReadControls().String()
+						}
+
+						noiseResult := diagnostics.UpdateNoiseTest(noiseCollector, &mediaState, f.Raw, noiseMeta)
 
 						switch noiseResult.Event {
 						case diagnostics.EventStarted, diagnostics.EventDone:
@@ -197,6 +231,29 @@ func main() {
 
 		fmt.Println("\nReturn to camera selection")
 	}
+}
+
+// toggleAutoLock locks or restores the camera's automatic exposure, white balance and focus.
+// Returns a message for the on-screen notification.
+func toggleAutoLock(cam *camera.Camera, locked *bool, saved *camera.Controls) string {
+	if *locked {
+		cam.UnlockAuto(*saved)
+		*locked = false
+		slog.Info("auto controls restored", "controls", cam.ReadControls().String())
+		return "Auto controls restored"
+	}
+
+	before, after := cam.LockAuto()
+	slog.Info("auto controls lock", "before", before.String(), "after", after.String())
+
+	applied := camera.LockApplied(before, after)
+	if len(applied) == 0 {
+		return "Auto controls lock not supported by camera backend"
+	}
+
+	*saved = before
+	*locked = true
+	return "Locked: " + strings.Join(applied, ", ")
 }
 
 // safeClose safely closes a channel if it has not been closed yet.

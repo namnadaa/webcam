@@ -9,14 +9,17 @@ import (
 )
 
 // Frame represents a single video frame with timestamp.
+// Img is the processed image, Raw is the untouched camera frame used for measurements.
 type Frame struct {
 	Img  gocv.Mat
+	Raw  gocv.Mat
 	Time time.Time
 }
 
 // Close releases frame resources.
 func (f *Frame) Close() {
 	f.Img.Close()
+	f.Raw.Close()
 }
 
 // StageToggle — pipeline element that can be turned on/off

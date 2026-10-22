@@ -36,13 +36,16 @@ func ReadStage(cam *camera.Camera, done <-chan struct{}, wg *sync.WaitGroup) <-c
 			}
 
 			cloned := frame.Clone()
+			raw := frame.Clone()
 
 			select {
 			case <-done:
 				cloned.Close()
+				raw.Close()
 				return
 			case out <- Frame{
 				Img:  cloned,
+				Raw:  raw,
 				Time: time.Now(),
 			}:
 			}
@@ -85,8 +88,9 @@ func GrayStage() StageFunc {
 						continue
 					}
 					dst, err := filters.Gray(f.Img)
-					f.Close()
+					f.Img.Close()
 					if err != nil {
+						f.Raw.Close()
 						mapErr("gray", err)
 						continue
 					}
@@ -94,9 +98,11 @@ func GrayStage() StageFunc {
 					select {
 					case <-done:
 						dst.Close()
+						f.Raw.Close()
 						return
 					case next <- Frame{
 						Img:  dst,
+						Raw:  f.Raw,
 						Time: f.Time,
 					}:
 					}
@@ -130,8 +136,9 @@ func BlurStage(p *control.PipelineParams) StageFunc {
 					p.RUnlock()
 
 					dst, err := filters.Blur(f.Img, ksize)
-					f.Close()
+					f.Img.Close()
 					if err != nil {
+						f.Raw.Close()
 						mapErr("blur", err)
 						continue
 					}
@@ -139,9 +146,11 @@ func BlurStage(p *control.PipelineParams) StageFunc {
 					select {
 					case <-done:
 						dst.Close()
+						f.Raw.Close()
 						return
 					case next <- Frame{
 						Img:  dst,
+						Raw:  f.Raw,
 						Time: f.Time,
 					}:
 					}
@@ -175,8 +184,9 @@ func EdgeStage(p *control.PipelineParams) StageFunc {
 					p.RUnlock()
 
 					dst, err := filters.Edge(f.Img, t1, t2)
-					f.Close()
+					f.Img.Close()
 					if err != nil {
+						f.Raw.Close()
 						mapErr("edge", err)
 						continue
 					}
@@ -184,9 +194,11 @@ func EdgeStage(p *control.PipelineParams) StageFunc {
 					select {
 					case <-done:
 						dst.Close()
+						f.Raw.Close()
 						return
 					case next <- Frame{
 						Img:  dst,
+						Raw:  f.Raw,
 						Time: f.Time,
 					}:
 					}
@@ -220,8 +232,9 @@ func BrightnessContrastStage(p *control.PipelineParams) StageFunc {
 					p.RUnlock()
 
 					dst, err := filters.BrightnessContrast(f.Img, alpha, beta)
-					f.Close()
+					f.Img.Close()
 					if err != nil {
+						f.Raw.Close()
 						mapErr("brightness_contrast", err)
 						continue
 					}
@@ -229,9 +242,11 @@ func BrightnessContrastStage(p *control.PipelineParams) StageFunc {
 					select {
 					case <-done:
 						dst.Close()
+						f.Raw.Close()
 						return
 					case next <- Frame{
 						Img:  dst,
+						Raw:  f.Raw,
 						Time: f.Time,
 					}:
 					}
@@ -261,8 +276,9 @@ func SharpenStage() StageFunc {
 						return
 					}
 					dst, err := filters.Sharpen(f.Img)
-					f.Close()
+					f.Img.Close()
 					if err != nil {
+						f.Raw.Close()
 						mapErr("sharpen", err)
 						continue
 					}
@@ -270,9 +286,11 @@ func SharpenStage() StageFunc {
 					select {
 					case <-done:
 						dst.Close()
+						f.Raw.Close()
 						return
 					case next <- Frame{
 						Img:  dst,
+						Raw:  f.Raw,
 						Time: f.Time,
 					}:
 					}
@@ -304,14 +322,16 @@ func ToBGRStage() StageFunc {
 					if f.Img.Type() == gocv.MatTypeCV8UC1 {
 						dst := gocv.NewMat()
 						_ = gocv.CvtColor(f.Img, &dst, gocv.ColorGrayToBGR)
-						f.Close()
+						f.Img.Close()
 
 						select {
 						case <-done:
 							dst.Close()
+							f.Raw.Close()
 							return
 						case next <- Frame{
 							Img:  dst,
+							Raw:  f.Raw,
 							Time: f.Time,
 						}:
 						}
