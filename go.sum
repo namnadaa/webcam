@@ -1,2 +1,6 @@
 gocv.io/x/gocv v0.42.0 h1:AAsrFJH2aIsQHukkCovWqj0MCGZleQpVyf5gNVRXjQI=
 gocv.io/x/gocv v0.42.0/go.mod h1:zYdWMj29WAEznM3Y8NsU3A0TRq/wR/cy75jeUypThqU=
+golang.org/x/image v0.30.0 h1:jD5RhkmVAnjqaCUXfbGBrn3lpxbknfN9w2UhHHU+5B4=
+golang.org/x/image v0.30.0/go.mod h1:SAEUTxCCMWSrJcCy/4HwavEsfZZJlYxeHLc6tTiAe/c=
+golang.org/x/text v0.28.0 h1:rhazDwis8INMIwQ4tpjLDzUhx6RlXqZNPEM0huQojng=
+golang.org/x/text v0.28.0/go.mod h1:U8nCwOR8jO/marOQ0QbDiOngZVEBB7MAiitBuMjXiNU=

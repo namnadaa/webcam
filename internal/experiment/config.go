@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"time"
+	"webcam/internal/i18n"
 )
 
 // Mode is the measurement scenario; it defines setup hints and how the report is interpreted.
@@ -17,7 +18,7 @@ const (
 	modeCount
 )
 
-// String returns the short mode name used in folder names and the UI.
+// String returns the short mode name used in folder names, CSV files and logs.
 func (m Mode) String() string {
 	switch m {
 	case ModeDark:
@@ -32,17 +33,32 @@ func (m Mode) String() string {
 	return "unknown"
 }
 
+// Title returns the mode name in the interface language.
+func (m Mode) Title() string {
+	switch m {
+	case ModeDark:
+		return i18n.T("dark")
+	case ModeLight:
+		return i18n.T("light")
+	case ModeStability:
+		return i18n.T("stability")
+	case ModeModulator:
+		return i18n.T("modulator")
+	}
+	return m.String()
+}
+
 // Hint tells the user how to prepare the camera for the mode.
 func (m Mode) Hint() string {
 	switch m {
 	case ModeDark:
-		return "cover the lens completely"
+		return i18n.T("cover the lens completely")
 	case ModeLight:
-		return "point at a uniform light source, avoid saturation"
+		return i18n.T("point at a uniform light source, avoid saturation")
 	case ModeStability:
-		return "fixed camera and static scene"
+		return i18n.T("fixed camera and static scene")
 	case ModeModulator:
-		return "switch the light on and off, keep the camera still"
+		return i18n.T("switch the light on and off, keep the camera still")
 	}
 	return ""
 }
@@ -100,18 +116,28 @@ func (c *Config) AdjustThreshold(delta float64) {
 	c.Threshold = math.Min(ThresholdMax, math.Max(ThresholdMin, t))
 }
 
-// String formats the config for notifications and console output.
+// String formats the config for logs.
 func (c Config) String() string {
-	return fmt.Sprintf("mode=%s duration=%s threshold=%.1f DN", c.Mode, FormatDuration(c.Duration()), c.Threshold)
+	return fmt.Sprintf("mode=%s duration=%s threshold=%.1f DN", c.Mode, c.Duration(), c.Threshold)
 }
 
-// FormatDuration prints durations as "30s", "5m" or "1m30s".
+// Text formats the config for the console and reports in the interface language.
+func (c Config) Text() string {
+	return i18n.Tf("mode %s, duration %s, threshold %.1f DN", c.Mode.Title(), FormatDuration(c.Duration()), c.Threshold)
+}
+
+// FormatDuration prints durations as "30s", "5m" or "1m30s" in the interface language.
 func FormatDuration(d time.Duration) string {
 	d = d.Round(time.Second)
-	if d >= time.Minute && d%time.Minute == 0 {
-		return fmt.Sprintf("%dm", int(d.Minutes()))
+	m, s := int(d/time.Minute), int(d%time.Minute/time.Second)
+
+	switch {
+	case m > 0 && s == 0:
+		return i18n.Tf("%dm", m)
+	case m > 0:
+		return i18n.Tf("%dm%ds", m, s)
 	}
-	return d.String()
+	return i18n.Tf("%ds", s)
 }
 
 // FormatClock prints durations as "mm:ss".

@@ -10,6 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"webcam/internal/helpers"
+	"webcam/internal/i18n"
+	"webcam/internal/textdraw"
 
 	"gocv.io/x/gocv"
 )
@@ -87,7 +90,8 @@ func Open() (*Graph, error) {
 	}
 
 	w := bufio.NewWriter(file)
-	fmt.Fprintln(w, "time,t_sec,mean,temporal_noise,threshold,above_threshold")
+	w.WriteString(helpers.CSVBOM)
+	w.WriteString(helpers.CSVRow("time", "t_sec", "mean", "temporal_noise", "threshold", "above_threshold"))
 
 	slog.Info("noise graph opened", "file", path)
 
@@ -139,16 +143,22 @@ func (g *Graph) Add(p Point, threshold float64) {
 
 // log appends a CSV row and flushes it to disk once a second.
 func (g *Graph) log(p Point, threshold float64) {
-	noise, above := "", 0
+	noise, above := "", "0"
 	if p.HasNoise {
-		noise = fmt.Sprintf("%.4f", p.Noise)
+		noise = helpers.CSVFloat(p.Noise, 4)
 		if p.Noise > threshold {
-			above = 1
+			above = "1"
 		}
 	}
 
-	fmt.Fprintf(g.csv, "%s,%.3f,%.4f,%s,%.1f,%d\n",
-		p.Time.Format("15:04:05.000"), p.Time.Sub(g.opened).Seconds(), p.Mean, noise, threshold, above)
+	g.csv.WriteString(helpers.CSVRow(
+		p.Time.Format("15:04:05.000"),
+		helpers.CSVFloat(p.Time.Sub(g.opened).Seconds(), 3),
+		helpers.CSVFloat(p.Mean, 4),
+		noise,
+		helpers.CSVFloat(threshold, 1),
+		above,
+	))
 
 	if time.Since(g.lastFlush) >= flushInterval {
 		if err := g.csv.Flush(); err != nil {
@@ -171,7 +181,8 @@ func (g *Graph) draw(now time.Time, threshold float64) {
 
 	thrY := scale(threshold, 0, noiseMax, noiseTop, noiseBottom)
 	_ = gocv.Line(&g.canvas, image.Pt(plotLeft, thrY), image.Pt(plotRight, thrY), colorThreshold, 1)
-	putText(&g.canvas, fmt.Sprintf("threshold %.1f", threshold), plotRight-130, noiseTop-12, colorThreshold)
+	thrLabel := i18n.Tf("threshold %.1f", threshold)
+	putText(&g.canvas, thrLabel, plotRight-textdraw.Width(thrLabel, textSize)-5, noiseTop-12, colorThreshold)
 
 	noiseClr := colorNoise
 	if last.HasNoise && last.Noise > threshold {
@@ -179,9 +190,9 @@ func (g *Graph) draw(now time.Time, threshold float64) {
 	}
 	drawSeries(&g.canvas, g.points, noiseOf, from, 0, noiseMax, noiseTop, noiseBottom, noiseClr)
 
-	title := "Temporal noise, DN: --"
+	title := i18n.T("Temporal noise, DN: --")
 	if last.HasNoise {
-		title = fmt.Sprintf("Temporal noise, DN: %.3f", last.Noise)
+		title = i18n.Tf("Temporal noise, DN: %.3f", last.Noise)
 	}
 	putText(&g.canvas, title, plotLeft, noiseTop-12, noiseClr)
 
@@ -190,14 +201,14 @@ func (g *Graph) draw(now time.Time, threshold float64) {
 	lo, hi = math.Floor(lo)-1, math.Ceil(hi)+1
 	drawAxes(&g.canvas, levelTop, levelBottom, lo, hi)
 	drawSeries(&g.canvas, g.points, meanOf, from, lo, hi, levelTop, levelBottom, colorLevel)
-	putText(&g.canvas, fmt.Sprintf("Level, DN: %.2f", last.Mean), plotLeft, levelTop-12, colorLevel)
+	putText(&g.canvas, i18n.Tf("Level, DN: %.2f", last.Mean), plotLeft, levelTop-12, colorLevel)
 
 	// ===== Time axis =====
 	for s := 0; s <= int(Span.Seconds()); s += 10 {
 		x := plotLeft + (plotRight-plotLeft)*s/int(Span.Seconds())
-		label := fmt.Sprintf("-%ds", int(Span.Seconds())-s)
+		label := i18n.Tf("-%ds", int(Span.Seconds())-s)
 		if s == int(Span.Seconds()) {
-			label = "0s"
+			label = i18n.T("0s")
 		}
 		putText(&g.canvas, label, x-15, levelBottom+20, colorText)
 	}
@@ -236,9 +247,12 @@ func drawSeries(img *gocv.Mat, points []Point, value func(Point) (float64, bool)
 	_ = gocv.Polylines(img, pv, false, clr, 1)
 }
 
-// putText draws small plain text.
+// textSize is the font size of the graph labels, pixels.
+const textSize = 14
+
+// putText draws small plain text with its baseline at y.
 func putText(img *gocv.Mat, text string, x, y int, clr color.RGBA) {
-	_ = gocv.PutText(img, text, image.Pt(x, y), gocv.FontHersheyPlain, 1.1, clr, 1)
+	textdraw.Draw(img, text, x, y, textSize, 0, clr)
 }
 
 func noiseOf(p Point) (float64, bool) { return p.Noise, p.HasNoise }

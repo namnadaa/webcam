@@ -6,8 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 	"webcam/internal/diagnostics"
+	"webcam/internal/helpers"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -24,10 +27,12 @@ const flushInterval = time.Second
 // Meta describes the capture conditions the experiment was run under.
 type Meta struct {
 	Camera     string
+	Backend    string // capture backend, e.g. "DirectShow"
 	Width      int
 	Height     int
 	FPS        float64 // reported by the driver
-	Format     string
+	Format     string  // pixel format the camera actually uses
+	Requested  string  // pixel format asked for, "" = driver default
 	AutoLocked bool
 	Controls   string
 }
@@ -96,7 +101,7 @@ type Session struct {
 // Start creates the experiment folder, writes meta.txt and opens data.csv.
 func Start(cfg Config, meta Meta, rows, cols int) (*Session, error) {
 	now := time.Now()
-	name := fmt.Sprintf("%s_%s_%dx%d@%g", now.Format("2006-01-02_15-04-05"), cfg.Mode, meta.Width, meta.Height, meta.FPS)
+	name := fmt.Sprintf("%s_%s_%dx%d@%g_%s", now.Format("2006-01-02_15-04-05"), cfg.Mode, meta.Width, meta.Height, meta.FPS, meta.Format)
 	dir := filepath.Join(RootDir, name)
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -113,7 +118,8 @@ func Start(cfg Config, meta Meta, rows, cols int) (*Session, error) {
 	}
 
 	w := bufio.NewWriter(file)
-	fmt.Fprintln(w, "frame,t_sec,mean,drift,spatial_std,temporal_noise,above_threshold,state")
+	w.WriteString(helpers.CSVBOM)
+	w.WriteString(helpers.CSVRow("frame", "t_sec", "mean", "drift", "spatial_std", "temporal_noise", "above_threshold", "state"))
 
 	s := &Session{
 		cfg:       cfg,
@@ -137,8 +143,8 @@ func Start(cfg Config, meta Meta, rows, cols int) (*Session, error) {
 	}
 
 	slog.Info("experiment started", "dir", dir, "config", cfg.String())
-	fmt.Printf("\nExperiment started: %s\n  Setup: %s\n  Noise threshold: %.1f DN\n  Output: %s\n",
-		cfg.String(), cfg.Mode.Hint(), cfg.Threshold, dir)
+	fmt.Print(i18n.Tf("\nExperiment started: %s\n  Setup: %s\n  Noise threshold: %.1f DN\n  Output: %s\n",
+		cfg.Text(), cfg.Mode.Hint(), cfg.Threshold, dir))
 
 	return s, nil
 }
@@ -234,16 +240,24 @@ func (s *Session) partFor(sample Sample) (*part, string) {
 
 // writeRow appends one CSV row and flushes to disk once a second.
 func (s *Session) writeRow(sample Sample, t time.Duration, above bool, state string) {
-	noise, aboveFlag := "", 0
+	noise, aboveFlag := "", "0"
 	if sample.HasNoise {
-		noise = fmt.Sprintf("%.4f", sample.Noise)
+		noise = helpers.CSVFloat(sample.Noise, 4)
 	}
 	if above {
-		aboveFlag = 1
+		aboveFlag = "1"
 	}
 
-	fmt.Fprintf(s.csv, "%d,%.3f,%.4f,%.4f,%.4f,%s,%d,%s\n",
-		s.frames, t.Seconds(), sample.Mean, sample.Mean-s.firstLevel, sample.SpatialStd, noise, aboveFlag, state)
+	s.csv.WriteString(helpers.CSVRow(
+		strconv.Itoa(s.frames),
+		helpers.CSVFloat(t.Seconds(), 3),
+		helpers.CSVFloat(sample.Mean, 4),
+		helpers.CSVFloat(sample.Mean-s.firstLevel, 4),
+		helpers.CSVFloat(sample.SpatialStd, 4),
+		noise,
+		aboveFlag,
+		state,
+	))
 
 	if time.Since(s.lastFlush) >= flushInterval {
 		if err := s.csv.Flush(); err != nil {
@@ -270,6 +284,7 @@ type Summary struct {
 	Height    int
 	FPS       float64 // reported by the driver
 	EffFPS    float64 // actually received
+	Format    string
 	Frames    int
 	Elapsed   time.Duration
 	Threshold float64
@@ -291,13 +306,23 @@ type Summary struct {
 	Period   float64 // seconds
 }
 
-// String formats the summary for notifications.
+// String formats the summary for logs.
 func (s Summary) String() string {
 	if s.Mode == ModeModulator {
 		return fmt.Sprintf("signal %.2f DN, SNR %.1f, noise ON %.3f / OFF %.3f DN, %d switches",
 			s.Signal, s.SNR, s.AvgNoise, s.OffNoise, s.Switches)
 	}
 	return fmt.Sprintf("noise %.3f DN (thr %.1f, above %.1f%%), drift %+.2f DN, %d frames",
+		s.AvgNoise, s.Threshold, s.AbovePct, s.Drift, s.Frames)
+}
+
+// Text formats the summary for notifications and the console in the interface language.
+func (s Summary) Text() string {
+	if s.Mode == ModeModulator {
+		return i18n.Tf("signal %.2f DN, SNR %.1f, noise ON %.3f / OFF %.3f DN, %d switches",
+			s.Signal, s.SNR, s.AvgNoise, s.OffNoise, s.Switches)
+	}
+	return i18n.Tf("noise %.3f DN (thr %.1f, above %.1f%%), drift %+.2f DN, %d frames",
 		s.AvgNoise, s.Threshold, s.AbovePct, s.Drift, s.Frames)
 }
 
@@ -343,7 +368,7 @@ func (s *Session) Finish(stopped bool) (Summary, error) {
 	}
 
 	slog.Info("experiment finished", "dir", s.dir, "frames", s.frames, "summary", summary.String())
-	fmt.Printf("\nExperiment finished (%s): %s\n  Report: %s\n", FormatDuration(elapsed), summary.String(), filepath.Join(s.dir, "report.txt"))
+	fmt.Print(i18n.Tf("\nExperiment finished (%s): %s\n  Report: %s\n", FormatDuration(elapsed), summary.Text(), filepath.Join(s.dir, "report.txt")))
 
 	return summary, nil
 }
@@ -359,6 +384,7 @@ func (s *Session) summary(elapsed time.Duration) Summary {
 		Height:    s.meta.Height,
 		FPS:       s.meta.FPS,
 		EffFPS:    s.effectiveFPS(),
+		Format:    s.meta.Format,
 		Frames:    s.frames,
 		Elapsed:   elapsed,
 		Threshold: s.cfg.Threshold,

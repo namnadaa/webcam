@@ -2,8 +2,10 @@ package camera
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -17,7 +19,25 @@ const (
 	APIAVFoundation = gocv.VideoCaptureAVFoundation // macOS AVFoundation
 	APIV4L2         = gocv.VideoCaptureV4L2         // Linux V4L2
 	APIMSMF         = gocv.VideoCaptureMSMF         // Windows Media Foundation
+	APIDShow        = gocv.VideoCaptureDshow        // Windows DirectShow
 )
+
+// BackendName returns a short name of a capture backend, e.g. "MSMF".
+func BackendName(api API) string {
+	switch api {
+	case APIAny:
+		return "auto"
+	case APIAVFoundation:
+		return "AVFoundation"
+	case APIV4L2:
+		return "V4L2"
+	case APIMSMF:
+		return "MSMF"
+	case APIDShow:
+		return "DirectShow"
+	}
+	return fmt.Sprintf("API %d", int(api))
+}
 
 // Config holds camera initialization parameters.
 type Config struct {
@@ -26,9 +46,14 @@ type Config struct {
 	Width  int
 	Height int
 	FPS    float64
-	Format string
+	Format string // FourCC pixel format, e.g. "MJPG"; "" lets the driver choose
 	Name   string
 }
+
+// Formats lists the pixel formats offered for selection.
+// MJPG is compressed (more frames per second, adds compression artifacts),
+// YUY2 and NV12 are uncompressed.
+var Formats = []string{"MJPG", "YUY2", "NV12"}
 
 // Camera represents an active video capture device.
 type Camera struct {
@@ -53,6 +78,11 @@ func Open(cfg Config) (*Camera, error) {
 	if cap == nil || !cap.IsOpened() {
 		cap.Close()
 		return nil, fmt.Errorf("no available camera found (API=%v)", cfg.API)
+	}
+
+	// the format must be set before the size: drivers pick the size from the formats they offer
+	if cfg.Format != "" {
+		cap.Set(gocv.VideoCaptureFOURCC, float64(FourCC(cfg.Format)))
 	}
 
 	if cfg.Width > 0 {
@@ -108,6 +138,17 @@ func (c *Camera) ActualSize() (w, h int) {
 	return int(wf + 0.5), int(hf + 0.5)
 }
 
+// Backend returns the name of the backend that actually opened the camera.
+func (c *Camera) Backend() string {
+	return BackendName(API(c.cap.Get(gocv.VideoCaptureBackend)))
+}
+
+// OpenDriverSettings opens the driver's own camera settings dialog.
+// Only DirectShow has one; other backends ignore the request.
+func (c *Camera) OpenDriverSettings() {
+	c.cap.Set(gocv.VideoCaptureSettings, 1)
+}
+
 // ActualFPS returns the applied frames per second.
 func (c *Camera) ActualFPS() float64 {
 	return c.cap.Get(gocv.VideoCaptureFPS)
@@ -116,6 +157,20 @@ func (c *Camera) ActualFPS() float64 {
 // PixelFormat returns the FOURCC pixel format of the camera stream.
 func (c *Camera) PixelFormat() int {
 	return int(c.cap.Get(gocv.VideoCaptureFOURCC))
+}
+
+// Format returns the applied pixel format as text, or "unknown" when the backend does not report it.
+func (c *Camera) Format() string {
+	if f := FourCCToString(c.PixelFormat()); f != "" {
+		return f
+	}
+	return "unknown"
+}
+
+// FourCC converts a four-letter format name into its integer code; shorter names are padded with spaces.
+func FourCC(name string) int {
+	b := []byte(name + "    ")[:4]
+	return int(b[0]) | int(b[1])<<8 | int(b[2])<<16 | int(b[3])<<24
 }
 
 // FourCCToString converts a FOURCC integer code into a human-readable string.
@@ -135,8 +190,8 @@ func FourCCToString(fourcc int) string {
 	return strings.TrimRight(string(b), " ")
 }
 
-// FindCameras searches for connected cameras and returns the Config list.
-func FindCameras() []Config {
+// FindCameras searches for cameras connected through the given backend and returns the Config list.
+func FindCameras(api API) []Config {
 	var cameras []Config
 
 	const maxIndex = 20
@@ -147,7 +202,7 @@ func FindCameras() []Config {
 	for i := 0; i < maxIndex; i++ {
 		cfg := Config{
 			Index: i,
-			API:   APIAny,
+			API:   api,
 		}
 
 		cam, err := Open(cfg)
@@ -186,25 +241,22 @@ func FindCameras() []Config {
 	return cameras
 }
 
-// AskCameraSettings optionally prompts the user to pick one of the supported modes (printed by PrintModes) and returns its values.
-func AskCameraSettings(modes []Mode) (int, int, float64, bool) {
-	var choice string
+// Settings are the camera parameters the user picked in the console.
+type Settings struct {
+	Width  int
+	Height int
+	FPS    float64
+	Format string // "" = driver default
+}
 
-	for {
-		fmt.Print("\nChange camera settings? (y/n): ")
-		fmt.Scan(&choice)
-		choice = strings.ToLower(strings.TrimSpace(choice))
-		if choice == "y" || choice == "n" {
-			break
-		}
-		fmt.Println("Please enter 'y' or 'n'")
+// AskCameraSettings optionally prompts the user to pick one of the supported modes (printed by PrintModes)
+// and a pixel format. Returns false when the user keeps the camera defaults.
+func AskCameraSettings(modes []Mode) (Settings, bool) {
+	if len(modes) == 0 || !askYesNo(i18n.T("\nChange camera settings? (y/n)")) {
+		return Settings{}, false
 	}
 
-	if choice != "y" || len(modes) == 0 {
-		return 0, 0, 0, false
-	}
-
-	m := modes[askNumber("Select resolution", len(modes))-1]
+	m := modes[askNumber(i18n.T("Select mode"), len(modes))-1]
 
 	fps := 0.0
 	if len(m.FPS) > 0 {
@@ -212,10 +264,48 @@ func AskCameraSettings(modes []Mode) (int, int, float64, bool) {
 		for i, v := range m.FPS {
 			fmt.Printf("[%d] %g FPS\n", i+1, v)
 		}
-		fps = m.FPS[askNumber("Select FPS", len(m.FPS))-1]
+		fps = m.FPS[askNumber(i18n.T("Select FPS"), len(m.FPS))-1]
 	}
 
-	return m.Width, m.Height, fps, true
+	format := m.Format
+	if format == "" {
+		format = askFormat()
+	}
+
+	return Settings{Width: m.Width, Height: m.Height, FPS: fps, Format: format}, true
+}
+
+// askYesNo prints the prompt and repeats until the answer is 'y' or 'n'.
+func askYesNo(prompt string) bool {
+	var choice string
+
+	for {
+		fmt.Print(prompt + ": ")
+		fmt.Scan(&choice)
+
+		// Russian д/н are accepted too, so the keyboard layout does not matter
+		switch strings.ToLower(strings.TrimSpace(choice)) {
+		case "y", "д":
+			return true
+		case "n", "н":
+			return false
+		}
+		fmt.Println(i18n.T("Please enter 'y' or 'n'"))
+	}
+}
+
+// askFormat lets the user pick a pixel format or keep the driver default.
+func askFormat() string {
+	fmt.Println(i18n.T("\n[1] auto (driver default)"))
+	for i, f := range Formats {
+		fmt.Printf("[%d] %s\n", i+2, f)
+	}
+
+	n := askNumber(i18n.T("Select format"), len(Formats)+1)
+	if n == 1 {
+		return ""
+	}
+	return Formats[n-2]
 }
 
 // askNumber reads a number in range [1, max] from stdin, repeating until the input is valid.
@@ -230,6 +320,23 @@ func askNumber(prompt string, max int) int {
 		if err == nil && n >= 1 && n <= max {
 			return n
 		}
-		fmt.Printf("Please enter a number from 1 to %d\n", max)
+		fmt.Print(i18n.Tf("Please enter a number from 1 to %d\n", max))
 	}
+}
+
+// ChooseBackend asks which capture backend to use. Only Windows has a choice:
+// Media Foundation is the default, DirectShow lets the program switch off auto exposure,
+// white balance and focus and opens the driver's settings dialog.
+func ChooseBackend() API {
+	if runtime.GOOS != "windows" {
+		return APIAny
+	}
+
+	fmt.Println(i18n.T("\nCamera backend:"))
+	fmt.Println(i18n.T("[1] Media Foundation (default)"))
+	fmt.Println(i18n.T("[2] DirectShow (recommended for experiments: auto controls lock [L], driver settings [O])"))
+	if askNumber(i18n.T("Select backend"), 2) == 2 {
+		return APIDShow
+	}
+	return APIMSMF
 }

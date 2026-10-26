@@ -1,13 +1,15 @@
 package experiment
 
 import (
-	"bufio"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
+	"webcam/internal/helpers"
+	"webcam/internal/i18n"
 )
 
 // Warmup is how long the camera runs after a mode switch before the measurement starts,
@@ -19,10 +21,14 @@ type Step struct {
 	Width  int
 	Height int
 	FPS    float64
+	Format string // pixel format to request, "" = driver default
 }
 
-// String returns the mode as "1280x720@30".
+// String returns the mode as "1280x720@30" or "1280x720@30 MJPG".
 func (s Step) String() string {
+	if s.Format != "" {
+		return fmt.Sprintf("%dx%d@%g %s", s.Width, s.Height, s.FPS, s.Format)
+	}
 	return fmt.Sprintf("%dx%d@%g", s.Width, s.Height, s.FPS)
 }
 
@@ -87,7 +93,7 @@ func (m *Matrix) Save(aborted bool) (string, error) {
 	}
 
 	slog.Info("mode matrix saved", "dir", dir, "steps", len(m.results), "aborted", aborted)
-	fmt.Printf("\nMode matrix finished: %d of %d modes measured\n  Summary: %s\n", len(m.results), len(m.steps), txtPath)
+	fmt.Print(i18n.Tf("\nMode matrix finished: %d of %d modes measured\n  Summary: %s\n", len(m.results), len(m.steps), txtPath))
 
 	return txtPath, nil
 }
@@ -95,19 +101,23 @@ func (m *Matrix) Save(aborted bool) (string, error) {
 // csv formats all results as a machine-readable table.
 func (m *Matrix) csv() string {
 	var b strings.Builder
-	w := bufio.NewWriter(&b)
 
-	fmt.Fprintln(w, "requested,width,height,fps_driver,fps_effective,frames,level,temporal_noise,above_threshold_pct,"+
-		"pixel_noise,non_uniformity,row_fpn,col_fpn,drift,off_level,off_noise,signal,snr,switches,period_s,dir")
+	b.WriteString(helpers.CSVBOM)
+	b.WriteString(helpers.CSVRow("requested", "width", "height", "format", "fps_driver", "fps_effective", "frames", "level",
+		"temporal_noise", "above_threshold_pct", "pixel_noise", "non_uniformity", "row_fpn", "col_fpn", "drift",
+		"off_level", "off_noise", "signal", "snr", "switches", "period_s", "dir"))
 
+	f := helpers.CSVFloat
 	for i, r := range m.results {
-		fmt.Fprintf(w, "%s,%d,%d,%.2f,%.2f,%d,%.4f,%.4f,%.2f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.2f,%d,%.3f,%s\n",
-			m.steps[i], r.Width, r.Height, r.FPS, r.EffFPS, r.Frames, r.Level, r.AvgNoise, r.AbovePct,
-			r.PixelNoise, r.NonUniformity, r.RowFPN, r.ColFPN, r.Drift,
-			r.OffLevel, r.OffNoise, r.Signal, r.SNR, r.Switches, r.Period, r.Dir)
+		b.WriteString(helpers.CSVRow(
+			m.steps[i].String(), strconv.Itoa(r.Width), strconv.Itoa(r.Height), r.Format,
+			f(r.FPS, 2), f(r.EffFPS, 2), strconv.Itoa(r.Frames), f(r.Level, 4), f(r.AvgNoise, 4), f(r.AbovePct, 2),
+			f(r.PixelNoise, 4), f(r.NonUniformity, 4), f(r.RowFPN, 4), f(r.ColFPN, 4), f(r.Drift, 4),
+			f(r.OffLevel, 4), f(r.OffNoise, 4), f(r.Signal, 4), f(r.SNR, 2), strconv.Itoa(r.Switches), f(r.Period, 3),
+			r.Dir,
+		))
 	}
 
-	_ = w.Flush()
 	return b.String()
 }
 
@@ -115,27 +125,28 @@ func (m *Matrix) csv() string {
 func (m *Matrix) text(aborted bool) string {
 	var b strings.Builder
 
-	status := "completed"
+	status := i18n.T("completed")
 	if aborted {
-		status = "aborted by user"
+		status = i18n.T("aborted by user")
 	}
 
-	fmt.Fprintf(&b, "MODE MATRIX\n===========\n")
-	fmt.Fprintf(&b, "Started:          %s\n", m.started.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(&b, "Experiment:       %s\n", m.cfg.String())
-	fmt.Fprintf(&b, "Modes:            %d of %d measured (%s)\n", len(m.results), len(m.steps), status)
-	fmt.Fprintf(&b, "Warmup per mode:  %s\n\n", FormatDuration(Warmup))
+	b.WriteString(i18n.T("MODE MATRIX\n===========\n"))
+	b.WriteString(i18n.Tf("Started:          %s\n", m.started.Format("2006-01-02 15:04:05")))
+	b.WriteString(i18n.Tf("Experiment:       %s\n", m.cfg.Text()))
+	b.WriteString(i18n.Tf("Modes:            %d of %d measured (%s)\n", len(m.results), len(m.steps), status))
+	b.WriteString(i18n.Tf("Warmup per mode:  %s\n\n", FormatDuration(Warmup)))
 
-	fmt.Fprintf(&b, "%-16s %-11s %7s %7s %8s %8s %8s %8s %8s %8s %8s",
-		"requested", "actual", "fps", "eff.fps", "level", "t.noise", "px.noise", "nonunif", "row.fpn", "col.fpn", "drift")
+	fmt.Fprintf(&b, "%-16s %-11s %-7s %7s %7s %8s %8s %8s %8s %8s %8s %8s",
+		i18n.T("requested"), i18n.T("actual"), i18n.T("format"), "fps", i18n.T("eff.fps"), i18n.T("level"), i18n.T("t.noise"),
+		i18n.T("px.noise"), i18n.T("nonunif"), i18n.T("row.fpn"), i18n.T("col.fpn"), i18n.T("drift"))
 	if m.cfg.Mode == ModeModulator {
-		fmt.Fprintf(&b, " %8s %8s %7s", "signal", "off.nse", "SNR")
+		fmt.Fprintf(&b, " %8s %8s %7s", i18n.T("signal"), i18n.T("off.nse"), "SNR")
 	}
 	b.WriteString("\n")
 
 	for i, r := range m.results {
-		fmt.Fprintf(&b, "%-16s %-11s %7.2f %7.2f %8.3f %8.4f %8.4f %8.4f %8.4f %8.4f %+8.3f",
-			m.steps[i], fmt.Sprintf("%dx%d", r.Width, r.Height), r.FPS, r.EffFPS, r.Level, r.AvgNoise,
+		fmt.Fprintf(&b, "%-16s %-11s %-7s %7.2f %7.2f %8.3f %8.4f %8.4f %8.4f %8.4f %8.4f %+8.3f",
+			m.steps[i], fmt.Sprintf("%dx%d", r.Width, r.Height), r.Format, r.FPS, r.EffFPS, r.Level, r.AvgNoise,
 			r.PixelNoise, r.NonUniformity, r.RowFPN, r.ColFPN, r.Drift)
 		if m.cfg.Mode == ModeModulator {
 			fmt.Fprintf(&b, " %8.3f %8.4f %7.2f", r.Signal, r.OffNoise, r.SNR)
@@ -143,11 +154,11 @@ func (m *Matrix) text(aborted bool) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\nAll values in DN. t.noise = temporal noise per frame, px.noise = per-pixel stddev over the run.\n")
+	b.WriteString(i18n.T("\nAll values in DN. t.noise = temporal noise per frame, px.noise = per-pixel stddev over the run.\n"))
 	if m.cfg.Mode == ModeModulator {
-		b.WriteString("Modulator: level, noise and field values are for light ON frames.\n")
+		b.WriteString(i18n.T("Modulator: level, noise and field values are for light ON frames.\n"))
 	}
-	b.WriteString("Detailed report of every mode: see the dir column in summary.csv.\n")
+	b.WriteString(i18n.T("Detailed report of every mode: see the dir column in summary.csv.\n"))
 
 	return b.String()
 }

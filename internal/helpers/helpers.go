@@ -1,13 +1,16 @@
 package helpers
 
-import "time"
+import (
+	"time"
+	"webcam/internal/i18n"
+)
 
-// onOff converts a boolean value into an ON/OFF status string.
+// OnOff converts a boolean value into an ON/OFF status string.
 func OnOff(v bool) string {
 	if v {
-		return "ON "
+		return i18n.T("ON ")
 	}
-	return "OFF"
+	return i18n.T("OFF")
 }
 
 // UpdateFPS calculates current FPS value.

@@ -137,6 +137,10 @@ func TestSessionWritesResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if !strings.HasSuffix(summary.Dir, "_dark_16x4@30_MJPG") || summary.Format != "MJPG" {
+		t.Errorf("dir %q / format %q do not carry the pixel format", summary.Dir, summary.Format)
+	}
+
 	if summary.Frames != 4 || summary.AvgNoise != 0 || summary.Drift != 2 {
 		t.Errorf("summary = %+v", summary)
 	}
@@ -147,12 +151,19 @@ func TestSessionWritesResults(t *testing.T) {
 		}
 	}
 
-	if lines := readLines(t, filepath.Join(summary.Dir, "data.csv")); len(lines) != 5 {
-		t.Errorf("data.csv has %d lines, want header + 4", len(lines))
+	lines := readLines(t, filepath.Join(summary.Dir, "data.csv"))
+	if len(lines) != 5 {
+		t.Fatalf("data.csv has %d lines, want header + 4", len(lines))
+	}
+	if !strings.HasPrefix(lines[0], "\uFEFFframe;t_sec;") {
+		t.Errorf("data.csv header = %q, want BOM and ';' separators", lines[0])
+	}
+	if want := "2;0,033;12,0000;2,0000;0,0000;0,0000;0;-"; lines[2] != want {
+		t.Errorf("data.csv row 2 = %q, want %q", lines[2], want)
 	}
 
 	report, _ := os.ReadFile(filepath.Join(summary.Dir, "report.txt"))
-	for _, want := range []string{"stopped by user", "Pixel noise:      avg 1.0000", "NOT locked", "Zones 8x6", "effective 30.30 FPS"} {
+	for _, want := range []string{"stopped by user", "Pixel noise:      avg 1.0000", "NOT locked", "Zones 8x6", "effective 30.30 FPS", "Format:           MJPG (requested: auto)"} {
 		if !strings.Contains(string(report), want) {
 			t.Errorf("report.txt does not contain %q", want)
 		}

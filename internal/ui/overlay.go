@@ -8,7 +8,8 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// RenderOverlay draws all UI layers on frame.
+// RenderOverlay draws all UI layers on frame, scaled to the frame height.
+// Right-side panels are stacked one under another; hidden panels take no space.
 func RenderOverlay(
 	img *gocv.Mat,
 	state State,
@@ -16,34 +17,39 @@ func RenderOverlay(
 	stages []pipeline.StageToggle,
 	fps float64,
 	width, height int,
+	format string,
 	cameraName string,
 	frameTime time.Time,
 	experiment ExperimentInfo,
 ) {
+	l := newLayout(img)
+
 	if state.ShowMenu {
-		DrawMenu(img)
+		drawMenu(img, l)
 	}
+
+	y := l.top
 
 	if state.ShowStats {
 		latency := time.Since(frameTime).Milliseconds()
-		DrawStats(img, fps, latency, width, height, cameraName)
+		y = drawStats(img, l, y, fps, latency, width, height, format, cameraName)
 	}
 
 	if state.ShowSettings {
-		DrawSettings(img, params)
+		y = drawSettings(img, l, y, params)
 	}
 
 	if state.ShowStatuses {
-		DrawStatuses(img, stages)
+		y = drawStatuses(img, l, y, stages)
 	}
 
 	if state.ShowControls {
-		DrawControls(img)
+		drawControls(img, l, y)
 	}
 
-	DrawExperiment(img, experiment)
+	drawExperiment(img, l, experiment)
 
 	if time.Now().Before(state.Notification.Until) {
-		DrawNotification(img, state.Notification.Message)
+		drawNotification(img, l, state.Notification.Message)
 	}
 }

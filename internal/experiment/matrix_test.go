@@ -10,7 +10,7 @@ import (
 func TestMatrix(t *testing.T) {
 	t.Chdir(t.TempDir())
 
-	steps := []Step{{640, 480, 30}, {1280, 720, 10}, {1920, 1080, 5}}
+	steps := []Step{{640, 480, 30, ""}, {1280, 720, 10, ""}, {1920, 1080, 5, "MJPG"}}
 	m := NewMatrix(steps, DefaultConfig())
 
 	if m.Progress() != "1/3" || m.Current().String() != "640x480@30" {

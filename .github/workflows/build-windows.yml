@@ -2,7 +2,7 @@ name: Build Windows
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
   workflow_dispatch:
 
 concurrency:
@@ -133,6 +133,10 @@ jobs:
           echo "none - all dependencies resolved"
 
           ls -la build/
+
+      - name: Copy documentation
+        shell: bash
+        run: cp -r docs build/docs
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

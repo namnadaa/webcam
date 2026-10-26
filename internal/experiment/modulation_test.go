@@ -105,7 +105,7 @@ func TestModulatorSession(t *testing.T) {
 	}
 
 	csv, _ := os.ReadFile(filepath.Join(summary.Dir, "data.csv"))
-	for _, want := range []string{",on\n", ",off\n", ",transition\n", ",unknown\n"} {
+	for _, want := range []string{";on\n", ";off\n", ";transition\n", ";unknown\n"} {
 		if !strings.Contains(string(csv), want) {
 			t.Errorf("data.csv has no %q rows", strings.TrimSpace(want))
 		}

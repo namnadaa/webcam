@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -15,13 +16,20 @@ type Controls struct {
 	AutoWB        float64
 	WBTemperature float64
 	AutoFocus     float64
+	Focus         float64
+}
+
+// Reported reports whether the backend returned any of the controls.
+// AVFoundation (macOS) returns 0 for all of them.
+func (c Controls) Reported() bool {
+	return c != Controls{}
 }
 
 // String formats controls for logs and reports.
 func (c Controls) String() string {
 	return fmt.Sprintf(
-		"auto_exposure=%g exposure=%g gain=%g auto_wb=%g wb_temperature=%g auto_focus=%g",
-		c.AutoExposure, c.Exposure, c.Gain, c.AutoWB, c.WBTemperature, c.AutoFocus,
+		"auto_exposure=%g exposure=%g gain=%g auto_wb=%g wb_temperature=%g auto_focus=%g focus=%g",
+		c.AutoExposure, c.Exposure, c.Gain, c.AutoWB, c.WBTemperature, c.AutoFocus, c.Focus,
 	)
 }
 
@@ -34,6 +42,7 @@ func (c *Camera) ReadControls() Controls {
 		AutoWB:        c.Get(gocv.VideoCaptureAutoWB),
 		WBTemperature: c.Get(gocv.VideoCaptureWBTemperature),
 		AutoFocus:     c.Get(gocv.VideoCaptureAutoFocus),
+		Focus:         c.Get(gocv.VideoCaptureFocus),
 	}
 }
 
@@ -60,6 +69,21 @@ func (c *Camera) LockAuto() (before, after Controls) {
 	c.Set(gocv.VideoCaptureAutoWB, 0)
 	c.Set(gocv.VideoCaptureAutoFocus, 0)
 
+	// DirectShow and Media Foundation switch a control to manual when its value is written,
+	// so writing back the current values freezes them even when the auto flags are ignored
+	for _, w := range []struct {
+		prop gocv.VideoCaptureProperties
+		val  float64
+	}{
+		{gocv.VideoCaptureExposure, before.Exposure},
+		{gocv.VideoCaptureWBTemperature, before.WBTemperature},
+		{gocv.VideoCaptureFocus, before.Focus},
+	} {
+		if w.val != 0 {
+			c.Set(w.prop, w.val)
+		}
+	}
+
 	return before, c.ReadControls()
 }
 
@@ -70,18 +94,33 @@ func (c *Camera) UnlockAuto(saved Controls) {
 	c.Set(gocv.VideoCaptureAutoFocus, saved.AutoFocus)
 }
 
-// LockApplied reports which automatic controls changed between two readbacks.
-// An empty result means the backend ignored the request.
+// LockApplied reports which automatic controls were switched off according to the readback.
 func LockApplied(before, after Controls) []string {
 	var changed []string
 	if before.AutoExposure != after.AutoExposure {
-		changed = append(changed, "exposure")
+		changed = append(changed, i18n.T("exposure"))
 	}
 	if before.AutoWB != after.AutoWB {
-		changed = append(changed, "white balance")
+		changed = append(changed, i18n.T("white balance"))
 	}
 	if before.AutoFocus != after.AutoFocus {
-		changed = append(changed, "focus")
+		changed = append(changed, i18n.T("focus"))
 	}
 	return changed
+}
+
+// ValuesFixed reports which control values LockAuto wrote back to switch them to manual.
+// The backend may not report the auto flags, so this is the only trace of the lock then.
+func ValuesFixed(before Controls) []string {
+	var fixed []string
+	if before.Exposure != 0 {
+		fixed = append(fixed, i18n.T("exposure"))
+	}
+	if before.WBTemperature != 0 {
+		fixed = append(fixed, i18n.T("white balance"))
+	}
+	if before.Focus != 0 {
+		fixed = append(fixed, i18n.T("focus"))
+	}
+	return fixed
 }

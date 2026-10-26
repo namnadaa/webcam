@@ -3,6 +3,7 @@ package experiment
 import (
 	"math"
 	"time"
+	"webcam/internal/i18n"
 )
 
 // LightState is the classification of a frame in the modulator mode.
@@ -26,6 +27,19 @@ func (s LightState) String() string {
 		return "on"
 	}
 	return "unknown"
+}
+
+// Title returns the state name in the interface language.
+func (s LightState) Title() string {
+	switch s {
+	case StateTransition:
+		return i18n.T("transition")
+	case StateOff:
+		return i18n.T("off")
+	case StateOn:
+		return i18n.T("on")
+	}
+	return i18n.T("unknown")
 }
 
 // Classifier tuning.
