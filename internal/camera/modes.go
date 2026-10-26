@@ -1,10 +1,12 @@
 package camera
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+	"webcam/internal/i18n"
 )
 
 // confirmTolerance is how far the measured FPS may be from the requested one
@@ -130,11 +132,11 @@ func formatLabel(m Mode) string {
 
 	switch {
 	case m.Format == "" && known:
-		return "auto (" + m.ActualFormat + ")"
+		return i18n.T("auto") + " (" + m.ActualFormat + ")"
 	case m.Format == "":
-		return "auto"
+		return i18n.T("auto")
 	case !known:
-		return m.Format + " (unverified)" // the backend does not report the format
+		return m.Format + " " + i18n.T("(unverified)") // the backend does not report the format
 	case m.ActualFormat != m.Format:
 		return m.Format + " -> " + m.ActualFormat
 	}
@@ -144,7 +146,7 @@ func formatLabel(m Mode) string {
 // PrintModes prints the numbered list of modes with requested, measured and driver-declared FPS.
 func PrintModes(modes []Mode) {
 	if len(modes) == 0 || !modes[0].Measured() {
-		fmt.Println("\nCamera modes (NOT measured, presets: the camera may not support all of them)")
+		fmt.Println(i18n.T("\nCamera modes (NOT measured, presets: the camera may not support all of them)"))
 		fmt.Println("===============================================================")
 		for i, m := range modes {
 			fmt.Printf("[%d] %-12s FPS: %s\n", i+1, m.String(), FormatFPS(m.FPS))
@@ -153,9 +155,9 @@ func PrintModes(modes []Mode) {
 		return
 	}
 
-	fmt.Println("\nCamera modes (measured)")
+	fmt.Println(i18n.T("\nCamera modes (measured)"))
 	fmt.Println("============================================================================")
-	fmt.Printf("%-5s %-11s %-17s %10s %9s %8s  %s\n", "#", "Resolution", "Format", "Requested", "Measured", "Driver", "Status")
+	fmt.Printf("%-5s %-11s %-17s %10s %9s %8s  %s\n", "#", i18n.T("Resolution"), i18n.T("Format"), i18n.T("Requested"), i18n.T("Measured"), i18n.T("Driver"), i18n.T("Status"))
 	fmt.Println("----------------------------------------------------------------------------")
 
 	for i, m := range modes {
@@ -169,8 +171,8 @@ func PrintModes(modes []Mode) {
 	}
 
 	fmt.Println("============================================================================")
-	fmt.Printf("Measured = frames really received. Not confirmed = more than %.0f%% off the request;\n", confirmTolerance*100)
-	fmt.Println("such frame rates are not offered for selection.")
+	fmt.Print(i18n.Tf("Measured = frames really received. Not confirmed = more than %.0f%% off the request;\n", confirmTolerance*100))
+	fmt.Println(i18n.T("such frame rates are not offered for selection."))
 }
 
 // resultLines formats measurements one per line; consecutive unconfirmed results are merged into one line.
@@ -180,7 +182,7 @@ func resultLines(results []FPSResult) []string {
 	for i := 0; i < len(results); {
 		r := results[i]
 		if r.Confirmed() {
-			lines = append(lines, fmt.Sprintf("%10g %9.1f %8g  ok", r.Requested, r.Measured, r.Declared))
+			lines = append(lines, fmt.Sprintf("%10g %9.1f %8g  %s", r.Requested, r.Measured, r.Declared, i18n.T("ok")))
 			i++
 			continue
 		}
@@ -226,9 +228,9 @@ func unconfirmedLine(run []FPSResult) string {
 		declared = fmt.Sprintf("%g-%g", declLo, declHi)
 	}
 
-	status := "not confirmed"
+	status := i18n.T("not confirmed")
 	if resized {
-		status += " (size changed)"
+		status += " " + i18n.T("(size changed)")
 	}
 	return fmt.Sprintf("%10s %9s %8s  %s", requested, measured, declared, status)
 }
@@ -239,7 +241,7 @@ func AskMatrix(modes []Mode) []Mode {
 	var input string
 
 	for {
-		fmt.Print("\nMode matrix: modes to compare (e.g. 1,3,5 or 'all', 'n' to skip): ")
+		fmt.Print(i18n.T("\nMode matrix: modes to compare (e.g. 1,3,5 or 'all', 'n' to skip): "))
 		fmt.Scan(&input)
 
 		input = strings.ToLower(strings.TrimSpace(input))
@@ -259,7 +261,7 @@ func AskMatrix(modes []Mode) []Mode {
 			selected = append(selected, modes[i])
 			runs += max(1, len(modes[i].FPS))
 		}
-		fmt.Printf("Mode matrix: %d camera modes, start it in the camera window with [U]\n", runs)
+		fmt.Print(i18n.Tf("Mode matrix: %d camera modes, start it in the camera window with [U]\n", runs))
 		return selected
 	}
 }
@@ -281,7 +283,7 @@ func ParseSelection(input string, n int) ([]int, error) {
 	for _, part := range strings.Split(input, ",") {
 		num, err := strconv.Atoi(strings.TrimSpace(part))
 		if err != nil || num < 1 || num > n {
-			return nil, fmt.Errorf("enter numbers from 1 to %d separated by commas, 'all' or 'n'", n)
+			return nil, errors.New(i18n.Tf("enter numbers from 1 to %d separated by commas, 'all' or 'n'", n))
 		}
 		if !seen[num] {
 			seen[num] = true

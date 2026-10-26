@@ -10,6 +10,7 @@ import (
 	"time"
 	"webcam/internal/diagnostics"
 	"webcam/internal/helpers"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -142,8 +143,8 @@ func Start(cfg Config, meta Meta, rows, cols int) (*Session, error) {
 	}
 
 	slog.Info("experiment started", "dir", dir, "config", cfg.String())
-	fmt.Printf("\nExperiment started: %s\n  Setup: %s\n  Noise threshold: %.1f DN\n  Output: %s\n",
-		cfg.String(), cfg.Mode.Hint(), cfg.Threshold, dir)
+	fmt.Print(i18n.Tf("\nExperiment started: %s\n  Setup: %s\n  Noise threshold: %.1f DN\n  Output: %s\n",
+		cfg.Text(), cfg.Mode.Hint(), cfg.Threshold, dir))
 
 	return s, nil
 }
@@ -305,13 +306,23 @@ type Summary struct {
 	Period   float64 // seconds
 }
 
-// String formats the summary for notifications.
+// String formats the summary for logs.
 func (s Summary) String() string {
 	if s.Mode == ModeModulator {
 		return fmt.Sprintf("signal %.2f DN, SNR %.1f, noise ON %.3f / OFF %.3f DN, %d switches",
 			s.Signal, s.SNR, s.AvgNoise, s.OffNoise, s.Switches)
 	}
 	return fmt.Sprintf("noise %.3f DN (thr %.1f, above %.1f%%), drift %+.2f DN, %d frames",
+		s.AvgNoise, s.Threshold, s.AbovePct, s.Drift, s.Frames)
+}
+
+// Text formats the summary for notifications and the console in the interface language.
+func (s Summary) Text() string {
+	if s.Mode == ModeModulator {
+		return i18n.Tf("signal %.2f DN, SNR %.1f, noise ON %.3f / OFF %.3f DN, %d switches",
+			s.Signal, s.SNR, s.AvgNoise, s.OffNoise, s.Switches)
+	}
+	return i18n.Tf("noise %.3f DN (thr %.1f, above %.1f%%), drift %+.2f DN, %d frames",
 		s.AvgNoise, s.Threshold, s.AbovePct, s.Drift, s.Frames)
 }
 
@@ -357,7 +368,7 @@ func (s *Session) Finish(stopped bool) (Summary, error) {
 	}
 
 	slog.Info("experiment finished", "dir", s.dir, "frames", s.frames, "summary", summary.String())
-	fmt.Printf("\nExperiment finished (%s): %s\n  Report: %s\n", FormatDuration(elapsed), summary.String(), filepath.Join(s.dir, "report.txt"))
+	fmt.Print(i18n.Tf("\nExperiment finished (%s): %s\n  Report: %s\n", FormatDuration(elapsed), summary.Text(), filepath.Join(s.dir, "report.txt")))
 
 	return summary, nil
 }

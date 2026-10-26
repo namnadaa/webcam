@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 	"webcam/internal/control"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -36,35 +37,35 @@ type StageFunc func(prev <-chan Frame, done <-chan struct{}, wg *sync.WaitGroup)
 func NewStages() []StageToggle {
 	return []StageToggle{
 		{
-			Name:    "Brightness/Contrast",
+			Name:    i18n.T("Brightness/Contrast"),
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return BrightnessContrastStage(p)
 			},
 		},
 		{
-			Name:    "Blur",
+			Name:    i18n.T("Blur"),
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return BlurStage(p)
 			},
 		},
 		{
-			Name:    "Edge",
+			Name:    i18n.T("Edge"),
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return EdgeStage(p)
 			},
 		},
 		{
-			Name:    "Gray",
+			Name:    i18n.T("Gray"),
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return GrayStage()
 			},
 		},
 		{
-			Name:    "Sharpen",
+			Name:    i18n.T("Sharpen"),
 			Enabled: false,
 			Build: func(p *control.PipelineParams) StageFunc {
 				return SharpenStage()

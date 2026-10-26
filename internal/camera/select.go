@@ -3,6 +3,7 @@ package camera
 import (
 	"fmt"
 	"strconv"
+	"webcam/internal/i18n"
 )
 
 // SelectCamera prompts user to select a camera by its number in the list (starting from 1) with input validation loop.
@@ -10,7 +11,7 @@ func SelectCamera(cameras []Config) (*Config, bool) {
 	var input string
 
 	for {
-		fmt.Printf("Enter camera number [1-%d] or 'q' to quit: ", len(cameras))
+		fmt.Print(i18n.Tf("Enter camera number [1-%d] or 'q' to quit: ", len(cameras)))
 		fmt.Scanln(&input)
 
 		if input == "q" || input == "Q" {
@@ -19,13 +20,13 @@ func SelectCamera(cameras []Config) (*Config, bool) {
 
 		number, err := strconv.Atoi(input)
 		if err != nil {
-			fmt.Println("Invalid input. Please enter a number.")
+			fmt.Println(i18n.T("Invalid input. Please enter a number."))
 			continue
 		}
 
 		cam, found := findCameraByNumber(cameras, number)
 		if !found {
-			fmt.Println("Camera not found. Try again.")
+			fmt.Println(i18n.T("Camera not found. Try again."))
 			continue
 		}
 

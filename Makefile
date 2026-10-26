@@ -66,7 +66,8 @@ clean:
 
 # ==== RELEASE ====
 # Create a macOS release package
-# Builds the macOS binary, copies README, and zips everything into a release archive
+# Builds the macOS binary, copies README and docs, and zips everything into a release archive
 release: clean build
 	cp README.md $(BUILD_DIR)/
-	cd $(BUILD_DIR) && zip $(APP_NAME)-release.zip webcam-macos README.md
+	cp -r docs $(BUILD_DIR)/docs
+	cd $(BUILD_DIR) && zip -r $(APP_NAME)-release.zip webcam-macos README.md docs

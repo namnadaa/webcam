@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -97,13 +98,13 @@ func (c *Camera) UnlockAuto(saved Controls) {
 func LockApplied(before, after Controls) []string {
 	var changed []string
 	if before.AutoExposure != after.AutoExposure {
-		changed = append(changed, "exposure")
+		changed = append(changed, i18n.T("exposure"))
 	}
 	if before.AutoWB != after.AutoWB {
-		changed = append(changed, "white balance")
+		changed = append(changed, i18n.T("white balance"))
 	}
 	if before.AutoFocus != after.AutoFocus {
-		changed = append(changed, "focus")
+		changed = append(changed, i18n.T("focus"))
 	}
 	return changed
 }
@@ -113,13 +114,13 @@ func LockApplied(before, after Controls) []string {
 func ValuesFixed(before Controls) []string {
 	var fixed []string
 	if before.Exposure != 0 {
-		fixed = append(fixed, "exposure")
+		fixed = append(fixed, i18n.T("exposure"))
 	}
 	if before.WBTemperature != 0 {
-		fixed = append(fixed, "white balance")
+		fixed = append(fixed, i18n.T("white balance"))
 	}
 	if before.Focus != 0 {
-		fixed = append(fixed, "focus")
+		fixed = append(fixed, i18n.T("focus"))
 	}
 	return fixed
 }

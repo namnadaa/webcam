@@ -14,6 +14,7 @@ import (
 	"webcam/internal/experiment"
 	"webcam/internal/graph"
 	"webcam/internal/helpers"
+	"webcam/internal/i18n"
 	"webcam/internal/logger"
 	"webcam/internal/media"
 	"webcam/internal/pipeline"
@@ -31,12 +32,14 @@ func main() {
 
 	runtime.LockOSThread()
 
+	i18n.Ask()
 	api := camera.ChooseBackend()
 
 	for {
 		cams := camera.FindCameras(api)
 		if len(cams) == 0 {
 			slog.Warn("No cameras found")
+			fmt.Println(i18n.T("No cameras found"))
 			return
 		}
 
@@ -45,7 +48,7 @@ func main() {
 
 		selected, ok := camera.SelectCamera(cams)
 		if !ok {
-			fmt.Println("Exiting program")
+			fmt.Println(i18n.T("Exiting program"))
 			return
 		}
 
@@ -82,7 +85,7 @@ func main() {
 
 		var matrix *experiment.Matrix
 		var matrixHome camera.Config // camera settings to return to after the matrix
-		fmt.Printf("\nNoise threshold: %.1f DN (change with -/= in the camera window)\n", exp.Config.Threshold)
+		fmt.Print(i18n.Tf("\nNoise threshold: %.1f DN (change with -/= in the camera window)\n", exp.Config.Threshold))
 
 		for {
 			cam, err := camera.Open(cfg)
@@ -97,7 +100,7 @@ func main() {
 			actualFPS := cam.ActualFPS()
 			format := cam.Format()
 			if cfg.Format != "" && format != cfg.Format {
-				fmt.Printf("\nWarning: requested format %s, camera uses %s\n", cfg.Format, format)
+				fmt.Print(i18n.Tf("\nWarning: requested format %s, camera uses %s\n", cfg.Format, format))
 				slog.Warn("pixel format not applied", "requested", cfg.Format, "actual", format)
 			}
 
@@ -156,7 +159,7 @@ func main() {
 						}
 
 						if matrix != nil && blockedDuringMatrix(action) {
-							uiState.ShowNotification("Mode matrix running, [U] aborts it", 2*time.Second)
+							uiState.ShowNotification(i18n.T("Mode matrix running, [U] aborts it"), 2*time.Second)
 							action = actions.ActionNone
 						}
 
@@ -175,14 +178,14 @@ func main() {
 								resolutionIndex, fpsIndex = camera.FindMode(modes, cfg.Width, cfg.Height, cfg.FPS, cfg.Format)
 								switchCamera = true
 							case len(steps) == 0:
-								uiState.ShowNotification("No modes selected for the matrix at startup", 3*time.Second)
+								uiState.ShowNotification(i18n.T("No modes selected for the matrix at startup"), 3*time.Second)
 							case exp.Running():
-								uiState.ShowNotification("Stop the experiment first ([B])", 3*time.Second)
+								uiState.ShowNotification(i18n.T("Stop the experiment first ([B])"), 3*time.Second)
 							default:
 								matrixHome = cfg
 								matrix = experiment.NewMatrix(steps, exp.Config)
 								applyStep(&cfg, matrix.Current())
-								fmt.Printf("\nMode matrix started: %d modes, %s\n", len(steps), exp.Config.String())
+								fmt.Print(i18n.Tf("\nMode matrix started: %d modes, %s\n", len(steps), exp.Config.String()))
 								switchCamera = true
 							}
 						case actions.ActionToggleAutoLock:
@@ -218,13 +221,13 @@ func main() {
 
 						switch event {
 						case media.RecorderStarted:
-							uiState.ShowNotification("Recording started", 2*time.Second)
+							uiState.ShowNotification(i18n.T("Recording started"), 2*time.Second)
 						case media.RecorderStopped:
-							uiState.ShowNotification("Recording stopped", 2*time.Second)
+							uiState.ShowNotification(i18n.T("Recording stopped"), 2*time.Second)
 						}
 
 						if media.HandleScreenshot(&mediaState, f.Img) {
-							uiState.ShowNotification("Screenshot saved", 2*time.Second)
+							uiState.ShowNotification(i18n.T("Screenshot saved"), 2*time.Second)
 						}
 
 						msg, finished := exp.Update(f.Raw, f.Time)
@@ -252,7 +255,7 @@ func main() {
 
 						if matrix != nil && !exp.Running() && time.Since(openedAt) >= experiment.Warmup {
 							meta := experimentMeta(cam, f, selected.Name, actualFPS, format, cfg.Format, autoLocked)
-							fmt.Printf("\nMode matrix %s: %s\n", matrix.Progress(), matrix.Current())
+							fmt.Print(i18n.Tf("\nMode matrix %s: %s\n", matrix.Progress(), matrix.Current()))
 							uiState.ShowNotification(exp.Toggle(meta), 3*time.Second)
 						}
 
@@ -320,7 +323,7 @@ func main() {
 			toggleGraph(&noiseGraph)
 		}
 
-		fmt.Println("\nReturn to camera selection")
+		fmt.Println(i18n.T("\nReturn to camera selection"))
 	}
 }
 
@@ -389,12 +392,12 @@ func experimentInfo(exp *experiment.Controller, matrix *experiment.Matrix) ui.Ex
 	if matrix != nil {
 		matrixText = matrix.Progress() + " " + matrix.Current().String()
 		if !exp.Running() {
-			matrixText += " warming up"
+			matrixText += " " + i18n.T("warming up")
 		}
 	}
 
 	return ui.ExperimentInfo{
-		Mode:      exp.Config.Mode.String(),
+		Mode:      exp.Config.Mode.Title(),
 		Duration:  experiment.FormatDuration(exp.Config.Duration()),
 		Threshold: exp.Config.Threshold,
 		Running:   exp.Running(),
@@ -416,17 +419,17 @@ func toggleGraph(g **graph.Graph) string {
 			slog.Error("noise graph close", "err", err)
 		}
 		*g = nil
-		return "Noise graph closed, data: " + path
+		return i18n.Tf("Noise graph closed, data: %s", path)
 	}
 
 	opened, err := graph.Open()
 	if err != nil {
 		slog.Error("noise graph open", "err", err)
-		return "Noise graph error: " + err.Error()
+		return i18n.Tf("Noise graph error: %v", err)
 	}
 	*g = opened
-	fmt.Printf("\nNoise graph logging to %s\n", opened.Path())
-	return "Noise graph opened, logging to " + opened.Path()
+	fmt.Print(i18n.Tf("\nNoise graph logging to %s\n", opened.Path()))
+	return i18n.Tf("Noise graph opened, logging to %s", opened.Path())
 }
 
 // toggleAutoLock locks or restores the camera's automatic exposure, white balance and focus.
@@ -436,7 +439,7 @@ func toggleAutoLock(cam *camera.Camera, locked *bool, saved *camera.Controls) st
 		cam.UnlockAuto(*saved)
 		*locked = false
 		slog.Info("auto controls restored", "controls", cam.ReadControls().String())
-		return "Auto controls restored"
+		return i18n.T("Auto controls restored")
 	}
 
 	before, after := cam.LockAuto()
@@ -444,26 +447,26 @@ func toggleAutoLock(cam *camera.Camera, locked *bool, saved *camera.Controls) st
 	slog.Info("auto controls lock", "backend", backend, "before", before.String(), "after", after.String())
 
 	if !before.Reported() && !after.Reported() {
-		fmt.Printf("\nAuto controls lock: the %s backend does not give access to exposure, white balance and focus\n", backend)
+		fmt.Print(i18n.Tf("\nAuto controls lock: the %s backend does not give access to exposure, white balance and focus\n", backend))
 		if runtime.GOOS == "windows" {
-			fmt.Println("Restart the program and choose the DirectShow backend, or set the camera manually with [O]")
+			fmt.Println(i18n.T("Restart the program and choose the DirectShow backend, or set the camera manually with [O]"))
 		}
-		return "Auto controls not supported by " + backend + " backend"
+		return i18n.Tf("Auto controls not supported by %s backend", backend)
 	}
 
 	applied := camera.LockApplied(before, after)
 	fixed := camera.ValuesFixed(before)
 	if len(applied) == 0 && len(fixed) == 0 {
-		return "Auto controls lock ignored by the camera driver"
+		return i18n.T("Auto controls lock ignored by the camera driver")
 	}
 
 	*saved = before
 	*locked = true
-	fmt.Printf("\nAuto controls locked (%s)\n  before: %s\n  after:  %s\n", backend, before, after)
+	fmt.Print(i18n.Tf("\nAuto controls locked (%s)\n  before: %s\n  after:  %s\n", backend, before, after))
 	if len(applied) > 0 {
-		return "Locked: " + strings.Join(applied, ", ")
+		return i18n.Tf("Locked: %s", strings.Join(applied, ", "))
 	}
-	return "Fixed at current values: " + strings.Join(fixed, ", ") + " (driver does not confirm)"
+	return i18n.Tf("Fixed at current values: %s (driver does not confirm)", strings.Join(fixed, ", "))
 }
 
 // openDriverSettings opens the camera driver's settings dialog, where auto exposure,
@@ -471,11 +474,11 @@ func toggleAutoLock(cam *camera.Camera, locked *bool, saved *camera.Controls) st
 func openDriverSettings(cam *camera.Camera) string {
 	backend := cam.Backend()
 	if backend != camera.BackendName(camera.APIDShow) {
-		return "Driver settings dialog needs the DirectShow backend (now " + backend + ")"
+		return i18n.Tf("Driver settings dialog needs the DirectShow backend (now %s)", backend)
 	}
 	cam.OpenDriverSettings()
 	slog.Info("driver settings dialog opened")
-	return "Driver settings opened: switch off Auto there"
+	return i18n.T("Driver settings opened: switch off Auto there")
 }
 
 // safeClose safely closes a channel if it has not been closed yet.

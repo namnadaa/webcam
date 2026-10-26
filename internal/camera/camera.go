@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -251,11 +252,11 @@ type Settings struct {
 // AskCameraSettings optionally prompts the user to pick one of the supported modes (printed by PrintModes)
 // and a pixel format. Returns false when the user keeps the camera defaults.
 func AskCameraSettings(modes []Mode) (Settings, bool) {
-	if len(modes) == 0 || !askYesNo("\nChange camera settings? (y/n)") {
+	if len(modes) == 0 || !askYesNo(i18n.T("\nChange camera settings? (y/n)")) {
 		return Settings{}, false
 	}
 
-	m := modes[askNumber("Select mode", len(modes))-1]
+	m := modes[askNumber(i18n.T("Select mode"), len(modes))-1]
 
 	fps := 0.0
 	if len(m.FPS) > 0 {
@@ -263,7 +264,7 @@ func AskCameraSettings(modes []Mode) (Settings, bool) {
 		for i, v := range m.FPS {
 			fmt.Printf("[%d] %g FPS\n", i+1, v)
 		}
-		fps = m.FPS[askNumber("Select FPS", len(m.FPS))-1]
+		fps = m.FPS[askNumber(i18n.T("Select FPS"), len(m.FPS))-1]
 	}
 
 	format := m.Format
@@ -282,24 +283,25 @@ func askYesNo(prompt string) bool {
 		fmt.Print(prompt + ": ")
 		fmt.Scan(&choice)
 
+		// Russian д/н are accepted too, so the keyboard layout does not matter
 		switch strings.ToLower(strings.TrimSpace(choice)) {
-		case "y":
+		case "y", "д":
 			return true
-		case "n":
+		case "n", "н":
 			return false
 		}
-		fmt.Println("Please enter 'y' or 'n'")
+		fmt.Println(i18n.T("Please enter 'y' or 'n'"))
 	}
 }
 
 // askFormat lets the user pick a pixel format or keep the driver default.
 func askFormat() string {
-	fmt.Println("\n[1] auto (driver default)")
+	fmt.Println(i18n.T("\n[1] auto (driver default)"))
 	for i, f := range Formats {
 		fmt.Printf("[%d] %s\n", i+2, f)
 	}
 
-	n := askNumber("Select format", len(Formats)+1)
+	n := askNumber(i18n.T("Select format"), len(Formats)+1)
 	if n == 1 {
 		return ""
 	}
@@ -318,7 +320,7 @@ func askNumber(prompt string, max int) int {
 		if err == nil && n >= 1 && n <= max {
 			return n
 		}
-		fmt.Printf("Please enter a number from 1 to %d\n", max)
+		fmt.Print(i18n.Tf("Please enter a number from 1 to %d\n", max))
 	}
 }
 
@@ -330,10 +332,10 @@ func ChooseBackend() API {
 		return APIAny
 	}
 
-	fmt.Println("\nCamera backend:")
-	fmt.Println("[1] Media Foundation (default)")
-	fmt.Println("[2] DirectShow (recommended for experiments: auto controls lock [L], driver settings [O])")
-	if askNumber("Select backend", 2) == 2 {
+	fmt.Println(i18n.T("\nCamera backend:"))
+	fmt.Println(i18n.T("[1] Media Foundation (default)"))
+	fmt.Println(i18n.T("[2] DirectShow (recommended for experiments: auto controls lock [L], driver settings [O])"))
+	if askNumber(i18n.T("Select backend"), 2) == 2 {
 		return APIDShow
 	}
 	return APIMSMF

@@ -45,7 +45,7 @@ func menuColumns(rows int) ([][]string, int) {
 	line := int(lineHeight*s + 0.5)
 	top := int(topPadding*s + 0.5)
 	available := (rows - top - bottomLines*line) / line
-	return splitMenu(menuLines, available), available
+	return splitMenu(menuLines(), available), available
 }
 
 func TestMenuColumns(t *testing.T) {

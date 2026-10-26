@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -36,23 +37,23 @@ const CacheDir = "cache"
 // when the user skips the probe or it fails.
 func ChooseModes(cam Config) []Mode {
 	if cached, ok := loadModes(cam); ok {
-		prompt := fmt.Sprintf("\nUse camera modes measured %s? (y = use saved, n = measure again)", cached.Measured.Format("2006-01-02 15:04"))
+		prompt := i18n.Tf("\nUse camera modes measured %s? (y = use saved, n = measure again)", cached.Measured.Format("2006-01-02 15:04"))
 		if askYesNo(prompt) {
 			return cached.Modes
 		}
 	}
 
-	if !askYesNo("\nMeasure camera modes now? Takes about a minute (y = measure, n = skip)") {
-		fmt.Println("Probe skipped: using preset modes, not all of them may be supported")
+	if !askYesNo(i18n.T("\nMeasure camera modes now? Takes about a minute (y = measure, n = skip)")) {
+		fmt.Println(i18n.T("Probe skipped: using preset modes, not all of them may be supported"))
 		return PresetModes()
 	}
 
-	fmt.Println("Keep normal lighting: in the dark webcams lower the frame rate on their own.")
+	fmt.Println(i18n.T("Keep normal lighting: in the dark webcams lower the frame rate on their own."))
 
 	modes, err := ProbeModes(cam.Index, cam.API)
 	if err != nil || len(modes) == 0 {
 		slog.Warn("could not probe camera modes, using presets", "err", err)
-		fmt.Println("Probe failed: using preset modes")
+		fmt.Println(i18n.T("Probe failed: using preset modes"))
 		return PresetModes()
 	}
 
@@ -91,7 +92,7 @@ func ProbeModes(index int, api API) ([]Mode, error) {
 		}
 	}
 
-	fmt.Printf("\r%-60s\rModes probed in %s\n", "", time.Since(start).Round(time.Second))
+	fmt.Printf("\r%-60s\r%s\n", "", i18n.Tf("Modes probed in %.0f s", time.Since(start).Seconds()))
 
 	sortModes(modes)
 	return modes, nil
@@ -120,7 +121,7 @@ func probeMode(cam *Camera, frame *gocv.Mat, r Resolution, format string, seen m
 	m := Mode{Width: w, Height: h, Format: format, ActualFormat: cam.Format()}
 
 	for _, fps := range FPSPresets {
-		fmt.Printf("\r%-60s", fmt.Sprintf("Probing %s @ %g FPS", m.String(), fps))
+		fmt.Printf("\r%-60s", i18n.Tf("Probing %s @ %g FPS", m.String(), fps))
 
 		cam.Set(gocv.VideoCaptureFPS, fps)
 		res := FPSResult{

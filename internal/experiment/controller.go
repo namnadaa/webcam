@@ -1,9 +1,9 @@
 package experiment
 
 import (
-	"fmt"
 	"log/slog"
 	"time"
+	"webcam/internal/i18n"
 
 	"gocv.io/x/gocv"
 )
@@ -59,28 +59,28 @@ func (c *Controller) ResetMeter() {
 // NextMode switches the experiment mode. Settings are fixed while an experiment runs.
 func (c *Controller) NextMode() string {
 	if c.Running() {
-		return "Stop the experiment first ([B])"
+		return i18n.T("Stop the experiment first ([B])")
 	}
 	c.Config.Mode = c.Config.Mode.Next()
-	return fmt.Sprintf("Mode: %s - %s", c.Config.Mode, c.Config.Mode.Hint())
+	return i18n.Tf("Mode: %s - %s", c.Config.Mode.Title(), c.Config.Mode.Hint())
 }
 
 // NextDuration switches the experiment duration.
 func (c *Controller) NextDuration() string {
 	if c.Running() {
-		return "Stop the experiment first ([B])"
+		return i18n.T("Stop the experiment first ([B])")
 	}
 	c.Config.NextDuration()
-	return "Duration: " + FormatDuration(c.Config.Duration())
+	return i18n.Tf("Duration: %s", FormatDuration(c.Config.Duration()))
 }
 
 // AdjustThreshold changes the noise threshold by delta.
 func (c *Controller) AdjustThreshold(delta float64) string {
 	if c.Running() {
-		return "Stop the experiment first ([B])"
+		return i18n.T("Stop the experiment first ([B])")
 	}
 	c.Config.AdjustThreshold(delta)
-	return fmt.Sprintf("Noise threshold: %.1f DN", c.Config.Threshold)
+	return i18n.Tf("Noise threshold: %.1f DN", c.Config.Threshold)
 }
 
 // Toggle starts a new experiment or stops the running one.
@@ -92,11 +92,11 @@ func (c *Controller) Toggle(meta Meta) string {
 	s, err := Start(c.Config, meta, meta.Height, meta.Width)
 	if err != nil {
 		slog.Error("experiment start", "err", err)
-		return "Experiment not started: " + err.Error()
+		return i18n.Tf("Experiment not started: %v", err)
 	}
 
 	c.session = s
-	return fmt.Sprintf("Experiment %s %s started: %s", c.Config.Mode, FormatDuration(c.Config.Duration()), c.Config.Mode.Hint())
+	return i18n.Tf("Experiment %s %s started: %s", c.Config.Mode.Title(), FormatDuration(c.Config.Duration()), c.Config.Mode.Hint())
 }
 
 // Stop ends the running experiment early and saves the results.
@@ -110,7 +110,7 @@ func (c *Controller) LightState() string {
 	if c.session == nil || c.session.Config().Mode != ModeModulator {
 		return ""
 	}
-	return c.session.State().String()
+	return c.session.State().Title()
 }
 
 // Update measures a raw camera frame and feeds it to the running experiment.
@@ -132,7 +132,7 @@ func (c *Controller) finish(stopped bool) (string, *Summary) {
 
 	if err != nil {
 		slog.Error("experiment finish", "err", err)
-		return "Experiment save error: " + err.Error(), &summary
+		return i18n.Tf("Experiment save error: %v", err), &summary
 	}
-	return "Experiment done: " + summary.String(), &summary
+	return i18n.Tf("Experiment done: %s", summary.Text()), &summary
 }

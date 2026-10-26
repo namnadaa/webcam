@@ -134,6 +134,10 @@ jobs:
 
           ls -la build/
 
+      - name: Copy documentation
+        shell: bash
+        run: cp -r docs build/docs
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
