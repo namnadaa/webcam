@@ -24,11 +24,13 @@ All documentation is in the [docs](docs/README.md) folder:
 | User guide: modes, how to use them and what they give you | [guide](docs/en/guide.md) | [руководство](docs/ru/guide.md) |
 | Glossary: all terms and CSV columns | [glossary](docs/en/glossary.md) | [глоссарий](docs/ru/glossary.md) |
 
+On GitHub the documentation is in Markdown. The Windows package contains the same documentation as HTML in the `docs` folder: open `docs/en/guide.html` or `docs/ru/guide.html` in a browser.
+
 ## Getting the program
 
 ### Windows
 
-Every push to `develop` and `main` builds the program in GitHub Actions. Download the `webcam-windows-x64` artifact from the latest successful run of the **Build Windows** workflow, unpack it and run `webcam.exe`. The artifact contains the required DLLs and the `docs` folder.
+Every push to `develop` and `main` builds the program in GitHub Actions. Download the `webcam-windows-x64` artifact from the latest successful run of the **Build Windows** workflow, unpack it and run `webcam.exe`. The artifact contains the required DLLs, a short `README.txt` and the `docs` folder with the documentation in HTML (start with `docs/en/guide.html` or `docs/ru/guide.html`).
 
 ### macOS (from source)
 

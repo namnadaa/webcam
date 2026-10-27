@@ -134,9 +134,63 @@ jobs:
 
           ls -la build/
 
-      - name: Copy documentation
+      # The Markdown docs stay in the repository for GitHub; the package gets
+      # self-contained HTML that opens in any browser without internet access.
+      - name: Build documentation (HTML)
         shell: bash
-        run: cp -r docs build/docs
+        run: |
+          choco install pandoc -y --no-progress
+          export PATH="$PATH:/c/Program Files/Pandoc"
+          pandoc --version | head -1
+
+          # links between the documents point to .md files; the parentheses keep
+          # only the first value returned by gsub
+          cat > links.lua <<'LUA'
+          function Link(el)
+            el.target = (el.target:gsub("%.md", ".html"))
+            return el
+          end
+          LUA
+
+          cat > style.html <<'CSS'
+          <style>
+            body { max-width: 52em; margin: 2em auto; padding: 0 1em; font-family: "Segoe UI", Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #222; }
+            table { border-collapse: collapse; margin: 1em 0; }
+            th, td { border: 1px solid #bbb; padding: 0.3em 0.6em; text-align: left; vertical-align: top; }
+            th { background: #f0f0f0; }
+            code, pre { background: #f2f2f2; border-radius: 3px; font-family: Consolas, "Courier New", monospace; }
+            code { padding: 0.1em 0.3em; }
+            pre { padding: 0.8em; overflow-x: auto; }
+            pre code { padding: 0; }
+            a { color: #0b5cad; }
+          </style>
+          CSS
+
+          find docs -name '*.md' | while read -r src; do
+            out="build/${src%.md}.html"
+            mkdir -p "$(dirname "$out")"
+            pandoc "$src" -f gfm -t html5 -s --embed-resources \
+              --lua-filter=links.lua -H style.html \
+              --metadata pagetitle="$(basename "$src" .md)" \
+              -o "$out"
+          done
+
+          ls -R build/docs
+
+      - name: Add README.txt
+        shell: bash
+        run: |
+          # UTF-8 with BOM and CRLF, so Windows Notepad shows Cyrillic correctly
+          {
+            printf '\xEF\xBB\xBF'
+            sed 's/$/\r/' <<'TXT'
+          Запуск: webcam.exe
+          Документация в папке docs, начните с docs\ru\guide.html (откройте в браузере).
+
+          Run: webcam.exe
+          Documentation is in the docs folder, start with docs\en\guide.html (open it in a browser).
+          TXT
+          } > build/README.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
