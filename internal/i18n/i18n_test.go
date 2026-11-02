@@ -111,3 +111,37 @@ func TestT(t *testing.T) {
 		t.Error("Russian translation not used")
 	}
 }
+
+func TestParseLang(t *testing.T) {
+	tests := []struct {
+		input string
+		want  Lang
+		valid bool
+	}{
+		{"", English, true},
+		{"1", English, true},
+		{" 2 \r", Russian, true}, // Windows console line ending
+		{"d", English, false},
+		{"3", English, false},
+		{"12", English, false},
+	}
+	for _, tt := range tests {
+		if got, valid := parseLang(tt.input); got != tt.want || valid != tt.valid {
+			t.Errorf("parseLang(%q) = %v %v, want %v %v", tt.input, got, valid, tt.want, tt.valid)
+		}
+	}
+}
+
+func TestReadLineKeepsRest(t *testing.T) {
+	r := strings.NewReader("d\n2\n")
+
+	if line, ok := readLine(r); line != "d" || !ok {
+		t.Errorf("first line = %q %v, want \"d\" true", line, ok)
+	}
+	if line, ok := readLine(r); line != "2" || !ok {
+		t.Errorf("second line = %q %v, want \"2\" true", line, ok)
+	}
+	if _, ok := readLine(r); ok {
+		t.Error("readLine at the end of input returned ok")
+	}
+}
